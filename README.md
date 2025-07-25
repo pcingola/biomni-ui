@@ -1,1 +1,3 @@
-# biomni-ui
+# Biomni-UI
+
+A UI for Biomni
