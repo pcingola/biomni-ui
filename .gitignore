@@ -186,3 +186,6 @@ logs/
 .vscode/
 
 docker-compose.override.yml
+
+# chainlit outputs
+.chainlit
