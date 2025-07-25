@@ -182,8 +182,6 @@ logs/
 /data
 /envs/_current/
 
-
-
 # vscode
 .vscode/
 
