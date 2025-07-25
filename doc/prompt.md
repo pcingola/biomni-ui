@@ -11,120 +11,49 @@ I want to build a minimal Chainlit UI to interface with Biomni (included as a su
 - Separate the Biomni data path from the directory used for logs and intermediate results. The latter should live outside the project directory.
 - Avoid adding unnecessary features. Focus strictly on the core functionality for this first iteration.
 - Keep the UI minimal and professional, no emojis or extra visuals.
+
+
+For the async execution do something like:
+
+import asyncio
+import chainlit as cl
+
+@cl.on_message
+async def on_message(msg: cl.Message):
+    await cl.Message(content="Starting async dual-stream command...").send()
+    
+    # Create async subprocess
+    process = await asyncio.create_subprocess_shell(
+        "for i in {1..5}; do echo stdout $i; echo stderr $i 1>&2; sleep 1; done",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    
+    # Async function to read from a stream
+    async def read_stream(stream, stream_name):
+        if stream:
+            while True:
+                line = await stream.readline()
+                if not line:  # EOF
+                    break
+                # Decode bytes to string and strip whitespace
+                text = line.decode('utf-8').strip()
+                await cl.Message(content=f"[{stream_name}] {text}").send()
+    
+    # Run both stream readers and process completion concurrently
+    stdout_task = asyncio.create_task(read_stream(process.stdout, "STDOUT"))
+    stderr_task = asyncio.create_task(read_stream(process.stderr, "STDERR"))
+    
+    # Wait for all tasks to complete
+    await asyncio.gather(stdout_task, stderr_task, process.wait())
+    
+    await cl.Message(content=f"Process finished with exit code {process.returncode}").send()
 ```
 
-### Output summary
-
-#### Project Overview
-
-A Chainlit-based user interface for Biomni that provides async execution and session management. The system allows users to interact with Biomni's biomedical AI capabilities through a web interface while maintaining session isolation and real-time output streaming.
-
-#### Architecture
-
-##### Core Components
-
-1. **Configuration Management** (`config.py`)
-   - Uses PydanticSettings for environment-based configuration
-   - Validates paths and creates directories automatically
-   - Supports external data directories outside the project
-
-2. **Session Management** (`session_manager.py`)
-   - Creates isolated sessions with unique UUIDs
-   - Manages session directories for logs and outputs
-   - Tracks conversation history in memory
-   - Simple cleanup on session end
-
-3. **Async Biomni Wrapper** (`biomni_wrapper.py`)
-   - Wraps Biomni A1 agent for non-blocking execution
-   - Uses shared Biomni data path to avoid re-downloading datasets
-   - Changes working directory to session outputs for file isolation
-   - Captures and streams output in real-time using asyncio queues
-
-4. **Chainlit Application** (`app.py`)
-   - Simple, professional UI without emojis
-   - Handles session lifecycle (start, message, end, stop)
-   - Streams responses in real-time
-   - Tracks generated files and displays them to users
-
-5. **Logging Utilities** (`logger.py`)
-   - Session-specific logging to isolated directories
-   - Configurable log levels and formats
-
-##### Key Design Decisions
-
-1. **External Data Storage**: All data directories are external to the project to avoid version control issues and allow for better scalability.
-
-2. **Shared Biomni Data**: Uses a single shared Biomni data directory to avoid re-downloading the large dataset for each session.
-
-3. **Session Isolation**: Each session gets its own directory structure for outputs and logs while sharing the Biomni data lake.
-
-4. **In-Memory Session Management**: Simple in-memory session tracking without persistence for MVP simplicity.
-
-5. **Async Execution**: Biomni agent runs in background threads with real-time output streaming to prevent UI blocking.
-
-#### Directory Structure
-
-```
-biomni-ui/
-├── biomni_ui/
-│   ├── __init__.py
-│   ├── app.py              # Main Chainlit application
-│   ├── config.py           # PydanticSettings configuration
-│   ├── session_manager.py  # Session isolation and management
-│   ├── biomni_wrapper.py   # Async Biomni A1 wrapper
-│   ├── logger.py           # Logging utilities
-│   └── .env.example        # Environment configuration template
-├── scripts/
-│   ├── config.sh           # Common configuration for scripts
-│   └── run.sh              # Application startup script
-├── Biomni/                 # Biomni submodule
-├── pyproject.toml          # Project configuration and dependencies
-└── README.md               # Documentation
-
-# External directories (configurable)
-~/biomni-ui-data/
-├── biomni_data/            # Shared Biomni data lake
-└── sessions/               # Session-specific data
-    └── {session_id}/
-        ├── logs/           # Session logs
-        └── outputs/        # Generated files
+```text
+This code is supposed to, when the user submits a message, run a call to the agent in async mode. While the process is going on we need to display realtime logs on UI capturing stdout and stderr. Is this code archiving this?
 ```
 
-#### Configuration
-
-The system uses environment variables for configuration:
-
-- **Required**: API keys (ANTHROPIC_API_KEY or OPENAI_API_KEY)
-- **Optional**: Paths, ports, logging levels, Biomni settings
-
-All configuration is handled through PydanticSettings with sensible defaults.
-
-#### Session Flow
-
-1. **Session Start**: Creates unique session ID and isolated directories
-2. **Message Processing**: Executes Biomni queries asynchronously with real-time streaming
-3. **File Tracking**: Monitors and reports generated files
-4. **Session End**: Cleans up in-memory data and closes session
-
-#### Dependencies
-
-- **chainlit**: Web UI framework
-- **pydantic**: Configuration and data validation
-- **pydantic-settings**: Environment-based configuration
-- **python-dotenv**: Environment variable loading
-
-#### Installation Requirements
-
-1. Biomni conda environment (biomni_e1)
-2. uv for dependency management
-3. Proper API key configuration
-
-#### Future Enhancements
-
-For production use, consider:
-- Session persistence to disk
-- User authentication
-- Session cleanup scheduling
-- Enhanced error handling
-- Performance monitoring
-- Multi-user support with proper isolation
+```text
+is there any code here that could be cleaned up? Remove all code that is not being used, its overcomplicated or it's not part of a core feature for the MVP
+```
