@@ -30,18 +30,8 @@ async def start():
         biomni_wrapper = AsyncBiomniWrapper(session_id)
         cl.user_session.set("biomni_wrapper", biomni_wrapper)
         
-        # Add welcome message to conversation history
-        session_manager.add_conversation_entry(
-            session_id, 
-            "system", 
-            "Session started",
-            {"session_id": session_id}
-        )
-        
         # Send welcome message
         welcome_msg = f"""Welcome to Biomni UI.
-
-Session ID: {session_id}
 
 I am your biomedical AI assistant. I can help you with biomedical research tasks, data analysis, experimental design, literature research, and database queries.
 
@@ -70,68 +60,26 @@ async def main(message: cl.Message):
     user_message = message.content
     logger.info(f"Session {session_id}: User message received")
     
-    # Add user message to conversation history
-    session_manager.add_conversation_entry(session_id, "user", user_message)
-    
     # Create a message for the response
-    response_msg = cl.Message(content="")
+    response_msg = cl.Message(content="Processing...")
     await response_msg.send()
     
     try:
-        # Show processing indicator
-        response_msg.content = "Processing..."
-        await response_msg.update()
-        
         # Execute query asynchronously and stream the response
         full_response = ""
-        chunk_count = 0
         
         async for output_chunk in biomni_wrapper.execute_query(user_message):
-            chunk_count += 1
-            
             if output_chunk.strip():
                 full_response += output_chunk + "\n"
-                
-                # Update the message with accumulated response
                 response_msg.content = full_response
                 await response_msg.update()
-                
-                # Small delay to make streaming visible
-                await asyncio.sleep(0.1)
-        
-        logger.info(f"Session {session_id}: Received {chunk_count} output chunks, total response length: {len(full_response)}")
-        
-        # Add final response to conversation history
-        session_manager.add_conversation_entry(
-            session_id, 
-            "assistant", 
-            full_response,
-            {"execution_completed": True}
-        )
-        
-        # Check for generated files
-        generated_files = biomni_wrapper.get_session_files()
-        if generated_files:
-            file_list = "\n".join([f"- {f.name}" for f in generated_files])
-            files_msg = f"\n\nGenerated files:\n{file_list}"
-            response_msg.content += files_msg
-            await response_msg.update()
         
         logger.info(f"Session {session_id}: Query completed successfully")
         
     except Exception as e:
-        error_msg = f"Error occurred: {str(e)}"
+        error_msg = f"Error: {str(e)}"
         response_msg.content = error_msg
         await response_msg.update()
-        
-        # Add error to conversation history
-        session_manager.add_conversation_entry(
-            session_id, 
-            "system", 
-            f"Error: {str(e)}",
-            {"error": True}
-        )
-        
         logger.error(f"Session {session_id}: Error processing message: {e}")
 
 
@@ -141,16 +89,7 @@ async def end():
     session_id = cl.user_session.get("session_id")
     
     if session_id:
-        # Add session end to conversation history
-        session_manager.add_conversation_entry(
-            session_id, 
-            "system", 
-            "Session ended"
-        )
-        
-        # Close the session
         session_manager.close_session(session_id)
-        
         logger.info(f"Session ended: {session_id}")
 
 
