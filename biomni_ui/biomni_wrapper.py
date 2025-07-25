@@ -55,8 +55,12 @@ class AsyncBiomniWrapper:
                 cwd=str(self.session_outputs_path)
             )
             
-            # Simple stream reading - just read stdout line by line
-            if process.stdout:
+            # Read both stdout and stderr concurrently using asyncio.gather
+            async def read_stdout():
+                """Read stdout and yield formatted output."""
+                if not process.stdout:
+                    return
+                    
                 while self._is_running:
                     line = await process.stdout.readline()
                     if not line:  # EOF
@@ -74,6 +78,61 @@ class AsyncBiomniWrapper:
                         
                         if text:
                             yield text
+            
+            async def read_stderr():
+                """Read stderr and yield formatted output."""
+                if not process.stderr:
+                    return
+                    
+                while self._is_running:
+                    line = await process.stderr.readline()
+                    if not line:  # EOF
+                        break
+                    
+                    text = line.decode('utf-8').strip()
+                    if text:
+                        # Format stderr with prefix
+                        if text.startswith('[ERROR]'):
+                            text = f"ERROR: {text[7:].strip()}"
+                        else:
+                            text = f"STDERR: {text}"
+                        yield text
+            
+            # Use a queue to merge outputs from both streams
+            output_queue: asyncio.Queue[tuple[str, str | None]] = asyncio.Queue()
+            
+            async def queue_stdout():
+                async for line in read_stdout():
+                    await output_queue.put(('stdout', line))
+                await output_queue.put(('stdout', None))  # EOF marker
+            
+            async def queue_stderr():
+                async for line in read_stderr():
+                    await output_queue.put(('stderr', line))
+                await output_queue.put(('stderr', None))  # EOF marker
+            
+            # Start both readers
+            stdout_task = asyncio.create_task(queue_stdout())
+            stderr_task = asyncio.create_task(queue_stderr())
+            
+            # Track which streams are still active
+            active_streams = {'stdout', 'stderr'}
+            
+            # Read from queue and yield output
+            while active_streams and self._is_running:
+                try:
+                    stream_type, line = await asyncio.wait_for(output_queue.get(), timeout=0.1)
+                    
+                    if line is None:  # EOF marker
+                        active_streams.discard(stream_type)
+                    else:
+                        yield line
+                        
+                except asyncio.TimeoutError:
+                    # Check if tasks are still running
+                    if stdout_task.done() and stderr_task.done():
+                        break
+                    continue
             
             # Wait for process to complete
             await process.wait()
