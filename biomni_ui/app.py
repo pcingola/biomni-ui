@@ -84,16 +84,27 @@ async def main(message: cl.Message):
         
         # Execute query asynchronously and stream the response
         full_response = ""
+        chunk_count = 0
+        logger.info(f"[DEBUG] Starting query execution for session {session_id}")
+        
         async for output_chunk in biomni_wrapper.execute_query(user_message):
+            chunk_count += 1
+            logger.info(f"[DEBUG] Received chunk {chunk_count}: {len(output_chunk)} chars - '{output_chunk[:50]}...'")
+            
             if output_chunk.strip():
                 full_response += output_chunk + "\n"
                 
                 # Update the message with accumulated response
                 response_msg.content = full_response
                 await response_msg.update()
+                logger.info(f"[DEBUG] Updated UI with {len(full_response)} total chars")
                 
                 # Small delay to make streaming visible
                 await asyncio.sleep(0.1)
+            else:
+                logger.info(f"[DEBUG] Skipped empty chunk {chunk_count}")
+        
+        logger.info(f"[DEBUG] Query execution completed. Total chunks: {chunk_count}, Final response length: {len(full_response)}")
         
         # Add final response to conversation history
         session_manager.add_conversation_entry(

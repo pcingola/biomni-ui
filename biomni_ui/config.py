@@ -14,8 +14,8 @@ class Config(BaseSettings):
     )
     
     # Biomni Configuration (passed through to Biomni)
-    biomni_llm_model: str = Field(default="claude-sonnet-4-20250514", description="LLM model to use for Biomni")
-    biomni_data_path: str = Field(default_factory=lambda: str(Path.home() / "biomni-ui-data" / "biomni_data"), description="Path to Biomni data directory")
+    biomni_llm_model: str = Field(default="anthropic/claude-sonnet-4", description="LLM model to use for Biomni")
+    biomni_data_path: str = Field(default="./data", description="Path to Biomni data directory")
     biomni_timeout_seconds: int = Field(default=600, gt=0, description="Timeout for Biomni operations in seconds")
     biomni_use_tool_retriever: bool = Field(default=True, description="Whether to use tool retriever in Biomni")
     biomni_base_url: str | None = Field(default=None, description="Custom base URL for Biomni LLM")

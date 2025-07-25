@@ -49,7 +49,6 @@ class AsyncBiomniWrapper:
                 self.agent = A1(
                     path=str(biomni_data_path),  # Shared data path
                     llm=config.biomni_llm_model,
-                    use_tool_retriever=config.biomni_use_tool_retriever,
                     timeout_seconds=config.biomni_timeout_seconds,
                     base_url=config.biomni_base_url,
                     api_key=config.biomni_api_key
@@ -109,52 +108,68 @@ class AsyncBiomniWrapper:
     
     async def _capture_output_and_run(self, query: str) -> str:
         """Capture stdout/stderr and run the agent in a thread."""
+        
+        async def send_output(content: str, prefix: str = "") -> None:
+            """Helper to send output to queue with proper formatting."""
+            if content and content.strip():
+                formatted_content = f"{prefix}{content}" if prefix else content
+                await self._output_queue.put(formatted_content)
+        
         def run_agent():
             """Run the agent and capture output."""
             output_buffer = StringIO()
             error_buffer = StringIO()
             
             try:
+                # Capture stdout/stderr during execution
                 with redirect_stdout(output_buffer), redirect_stderr(error_buffer):
                     log, final_result = self.agent.go(query)
                 
-                # Send captured output to the queue
-                captured_output = output_buffer.getvalue()
-                if captured_output:
-                    asyncio.run_coroutine_threadsafe(
-                        self._output_queue.put(captured_output), 
-                        asyncio.get_event_loop()
-                    )
+                # Force flush buffers
+                sys.stdout.flush()
+                sys.stderr.flush()
                 
-                # Send any errors
-                captured_errors = error_buffer.getvalue()
-                if captured_errors:
-                    asyncio.run_coroutine_threadsafe(
-                        self._output_queue.put(f"**Errors:**\n{captured_errors}"), 
-                        asyncio.get_event_loop()
-                    )
-                
-                # Process the log entries for real-time output
-                if log:
-                    for entry in log:
-                        if entry and entry.strip():
-                            asyncio.run_coroutine_threadsafe(
-                                self._output_queue.put(entry), 
-                                asyncio.get_event_loop()
-                            )
-                
-                return final_result
+                return {
+                    'log': log,
+                    'final_result': final_result,
+                    'captured_output': output_buffer.getvalue(),
+                    'captured_errors': error_buffer.getvalue()
+                }
                 
             except Exception as e:
-                asyncio.run_coroutine_threadsafe(
-                    self._output_queue.put(f"**Execution Error:**\n{str(e)}"), 
-                    asyncio.get_event_loop()
-                )
-                return str(e)
+                return {
+                    'log': [],
+                    'final_result': str(e),
+                    'captured_output': output_buffer.getvalue(),
+                    'captured_errors': error_buffer.getvalue(),
+                    'error': str(e)
+                }
         
-        # Run in thread pool to avoid blocking the event loop
+        # Run agent in executor
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, run_agent)
+        result = await loop.run_in_executor(None, run_agent)
+        
+        # Process results and send to queue
+        if result.get('error'):
+            await send_output(f"**Execution Error:**\n{result['error']}")
+        
+        # Send captured stdout if any
+        if result['captured_output']:
+            await send_output(result['captured_output'], "**Captured Output:**\n")
+        
+        # Send captured stderr if any
+        if result['captured_errors']:
+            await send_output(result['captured_errors'], "**Captured Errors:**\n")
+        
+        # Send log entries with real-time streaming
+        if result['log']:
+            for entry in result['log']:
+                if entry and entry.strip():
+                    await send_output(entry)
+                    # Small delay for streaming effect
+                    await asyncio.sleep(0.05)
+        
+        return result['final_result']
     
     def stop_execution(self) -> None:
         """Stop the current execution."""
