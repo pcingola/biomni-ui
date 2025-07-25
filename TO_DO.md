@@ -5,6 +5,7 @@
 - [ ] Add Chainlit
 - [ ] Add file upload capability
 - [ ] Add session management
+- [ ] Add disclaimer message
 
 ## To prioritize
 
