@@ -69,18 +69,18 @@ class AsyncBiomniWrapper:
         os.chdir(str(self.session_outputs_path))
         
         try:
-            # Run the agent in a separate thread to avoid blocking
-            loop = asyncio.get_event_loop()
-            
             # Create a task to capture output and run the agent
             output_task = asyncio.create_task(self._capture_output_and_run(query))
             
-            # Yield output as it becomes available
-            while self._is_running or not self._output_queue.empty():
+            # Yield output as it becomes available with improved streaming
+            output_received = False
+            while self._is_running:
                 try:
-                    # Wait for output with a timeout to check if execution is done
-                    output = await asyncio.wait_for(self._output_queue.get(), timeout=0.1)
-                    yield output
+                    # Wait for output with a shorter timeout for better responsiveness
+                    output = await asyncio.wait_for(self._output_queue.get(), timeout=0.05)
+                    output_received = True
+                    if output and output.strip():
+                        yield output
                 except asyncio.TimeoutError:
                     # Check if the task is done
                     if output_task.done():
@@ -90,14 +90,24 @@ class AsyncBiomniWrapper:
             # Wait for the task to complete and get final result
             final_result = await output_task
             
-            # Yield any remaining output
+            # Yield any remaining output in the queue
             while not self._output_queue.empty():
-                output = await self._output_queue.get()
-                yield output
+                try:
+                    output = self._output_queue.get_nowait()
+                    if output and output.strip():
+                        output_received = True
+                        yield output
+                except asyncio.QueueEmpty:
+                    break
             
-            # Yield final result if it's not empty
+            # Yield final result if it's not empty and we haven't received other output
             if final_result and final_result.strip():
                 yield f"\n**Final Result:**\n{final_result}"
+                output_received = True
+            
+            # If no output was received at all, yield a message
+            if not output_received:
+                yield "**No output captured** - This might indicate an issue with output redirection."
                 
         except Exception as e:
             yield f"\n**Error occurred:**\n{str(e)}"
