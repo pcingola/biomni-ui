@@ -24,7 +24,7 @@ class AsyncBiomniWrapper:
         """Initialize the Biomni A1 agent with shared data path."""
         # Import Biomni here to avoid import issues if not installed
         try:
-            from Biomni.biomni.agent import A1
+            from biomni.agent import A1
             use_mock = False
         except ImportError:
             print("Biomni not available, using mock implementation for testing")
