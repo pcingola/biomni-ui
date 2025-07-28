@@ -177,6 +177,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "python-dotenv" },
+    { name = "tiktoken" },
 ]
 
 [package.metadata]
@@ -185,6 +186,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "pydantic-settings", specifier = ">=2.0.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
+    { name = "tiktoken", specifier = ">=0.9.0" },
 ]
 
 [[package]]

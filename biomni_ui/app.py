@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import re
+import tiktoken
 from pathlib import Path
 
 import chainlit as cl
@@ -14,6 +16,13 @@ logging.basicConfig(
     format=config.log_format
 )
 logger = logging.getLogger(__name__)
+
+# Initialize tokenizer for LLM token counting
+tokenizer = tiktoken.get_encoding("cl100k_base")
+
+# Define a pattern to split text into sentences for better streaming
+SENTENCE_END_PATTERN = re.compile(r"[.!?\n]")
+
 
 
 @cl.on_chat_start
@@ -49,38 +58,64 @@ Please ask your question and I will use specialized tools and knowledge to assis
 
 @cl.on_message
 async def main(message: cl.Message):
-    """Handle incoming messages."""
+    """Handle incoming messages and delegate processing."""
     session_id = cl.user_session.get("session_id")
     biomni_wrapper = cl.user_session.get("biomni_wrapper")
-    
+
     if not session_id or not biomni_wrapper:
         await cl.Message(content="Session not found. Please refresh the page.").send()
         return
-    
-    user_message = message.content
+
+    user_message = message.content.strip()
     logger.info(f"Session {session_id}: User message received")
-    
-    # Create a message for the response
+
     response_msg = cl.Message(content="Processing...")
     await response_msg.send()
-    
+
     try:
-        # Execute query asynchronously and stream the response
-        full_response = ""
-        
-        async for output_chunk in biomni_wrapper.execute_query(user_message):
-            if output_chunk.strip():
-                full_response += output_chunk + "\n"
-                response_msg.content = full_response
-                await response_msg.update()
-        
-        logger.info(f"Session {session_id}: Query completed successfully")
-        
+        await stream_response(user_message, biomni_wrapper, response_msg, session_id)
     except Exception as e:
         error_msg = f"Error: {str(e)}"
         response_msg.content = error_msg
         await response_msg.update()
         logger.error(f"Session {session_id}: Error processing message: {e}")
+
+
+async def stream_response(
+    user_message: str,
+    biomni_wrapper,
+    response_msg: cl.Message,
+    session_id: str,
+    token_threshold: int = 30
+) -> None:
+    """Stream response in semantically complete slices."""
+    full_response = ""
+    current_chunk = ""
+    tokens_since_last_update = 0
+
+    async for output_chunk in biomni_wrapper.execute_query(user_message):
+        if not output_chunk.strip():
+            continue
+
+        current_chunk += output_chunk
+        tokens_in_chunk = len(tokenizer.encode(output_chunk))
+        tokens_since_last_update += tokens_in_chunk
+
+        # If sentence-ending punctuation is found and token threshold reached
+        if SENTENCE_END_PATTERN.search(current_chunk) and tokens_since_last_update >= token_threshold:
+            full_response += current_chunk
+            response_msg.content = full_response + "▌"
+            await response_msg.update()
+            current_chunk = ""
+            tokens_since_last_update = 0
+
+    # Final update
+    if current_chunk:
+        full_response += current_chunk
+        response_msg.content = full_response.strip()
+        await response_msg.update()
+
+    logger.info(f"Session {session_id}: Query completed successfully")
 
 
 @cl.on_chat_end

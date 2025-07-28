@@ -1,5 +1,5 @@
 from pathlib import Path
-from pydantic import Field, validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,7 +29,8 @@ class Config(BaseSettings):
     # Logging Configuration
     log_format: str = Field(default="%(asctime)s - %(name)s - %(levelname)s - %(message)s", description="Log format string")
     
-    @validator("log_level")
+    @field_validator("log_level")
+    @classmethod
     def validate_log_level(cls, v):
         """Validate log level."""
         valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -37,7 +38,8 @@ class Config(BaseSettings):
             raise ValueError(f"log_level must be one of {valid_levels}")
         return v.upper()
     
-    @validator("session_data_path")
+    @field_validator("session_data_path")
+    @classmethod
     def validate_session_path(cls, v):
         """Validate and create session data path if it doesn't exist."""
         path = Path(v)
