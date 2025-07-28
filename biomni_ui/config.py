@@ -26,6 +26,22 @@ class Config(BaseSettings):
     chainlit_port: int = Field(default=8000, gt=0, le=65535, description="Port for Chainlit server")
     chainlit_host: str = Field(default="0.0.0.0", description="Host for Chainlit server")
     
+    # File Upload Configuration
+    file_upload_enabled: bool = Field(default=True, description="Enable file upload functionality")
+    max_file_size_mb: int = Field(default=100, gt=0, le=1000, description="Maximum file size in MB")
+    allowed_file_types: list[str] = Field(
+        default=[
+            "pdf", "docx", "txt", "md",  # Documents
+            "png", "jpg", "jpeg", "tiff", "tif", "bmp", "gif",  # Images
+            "csv", "tsv", "json", "xml", "yaml", "yml",  # Data files
+            "fasta", "fa", "fastq", "fq", "bed", "vcf", "gff", "gtf",  # Bioinformatics
+            "xlsx", "xls", "ods"  # Spreadsheets
+        ],
+        description="List of allowed file extensions"
+    )
+    file_retention_hours: int = Field(default=24, gt=0, le=168, description="Hours to retain uploaded files")
+    enable_file_scanning: bool = Field(default=False, description="Enable virus/malware scanning of uploaded files")
+    
     # Logging Configuration
     log_format: str = Field(default="%(asctime)s - %(name)s - %(levelname)s - %(message)s", description="Log format string")
     
@@ -60,6 +76,24 @@ class Config(BaseSettings):
     def get_session_outputs_path(self, session_id: str) -> Path:
         """Get outputs path for a specific session."""
         return self.get_session_data_path() / session_id / "outputs"
+    
+    def get_session_uploads_path(self, session_id: str) -> Path:
+        """Get uploads path for a specific session."""
+        return self.get_session_data_path() / session_id / "uploads"
+    
+    def get_session_processed_path(self, session_id: str) -> Path:
+        """Get processed files path for a specific session."""
+        return self.get_session_data_path() / session_id / "processed"
+    
+    @field_validator("allowed_file_types")
+    @classmethod
+    def validate_file_types(cls, v):
+        """Validate and normalize file types."""
+        if not v:
+            raise ValueError("At least one file type must be allowed")
+        # Normalize to lowercase and remove dots
+        normalized = [ext.lower().lstrip('.') for ext in v]
+        return normalized
 
 
 # Global config instance

@@ -7,6 +7,7 @@ A Chainlit-based user interface for Biomni with async execution and session mana
 - **Async Execution**: Non-blocking execution of Biomni queries to prevent UI freezing
 - **Session Management**: Isolated sessions with dedicated directories for logs and outputs
 - **Real-time Streaming**: Live output streaming from Biomni to the UI
+- **File Upload Support**: Upload and analyze documents, images, and bioinformatics data
 - **File Management**: Automatic tracking of files generated during sessions
 - **Configuration**: Environment-based configuration using `.env` files
 
@@ -59,6 +60,12 @@ Copy `biomni_ui/.env.example` to `.env` and configure the following variables:
 - `CHAINLIT_PORT`: Port for the web interface (default: 8000)
 - `LOG_LEVEL`: Logging level (default: INFO)
 
+### File Upload (Optional)
+- `FILE_UPLOAD_ENABLED`: Enable file upload functionality (default: true)
+- `MAX_FILE_SIZE_MB`: Maximum file size in MB (default: 100)
+- `FILE_RETENTION_HOURS`: Hours to retain uploaded files (default: 24)
+- `ENABLE_FILE_SCANNING`: Enable virus scanning (default: false)
+
 ## Usage
 
 ### With Full Biomni Setup
@@ -76,6 +83,30 @@ conda activate biomni_e1
 3. Open your browser and navigate to `http://localhost:8000`
 
 4. Start asking biomedical questions and get responses from Biomni
+
+### File Upload Usage
+
+The interface supports uploading various file types for analysis:
+
+**Supported File Types:**
+- **Documents**: PDF, DOCX, TXT, MD
+- **Images**: PNG, JPG, TIFF, BMP, GIF
+- **Data**: CSV, TSV, JSON, XML, YAML, Excel files
+- **Bioinformatics**: FASTA, FASTQ, BED, VCF, GFF, GTF
+
+**How to Upload:**
+1. Drag and drop files into the chat interface, or
+2. Use the file upload button
+3. Files are automatically validated and made available to Biomni
+4. Ask questions about your uploaded files
+
+**Example:**
+```
+Upload: experiment_data.csv
+Query: "Analyze this experimental data and identify any significant patterns"
+```
+
+See [`doc/file_upload.md`](doc/file_upload.md) for detailed documentation.
 
 ### Testing with Mock (No Biomni Required)
 
