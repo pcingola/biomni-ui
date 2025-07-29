@@ -172,10 +172,12 @@ class FileManager:
         for uploaded_file in uploaded_files:
             file_path = uploaded_file.get_file_path(session_id)
             if file_path.exists():
+                # Use absolute path to ensure subprocess can find the file regardless of working directory
+                absolute_path = file_path.resolve()
                 context_parts.append(
                     f"- {uploaded_file.original_filename} "
                     f"({uploaded_file.file_extension.upper()}, {uploaded_file.file_size} bytes) "
-                    f"at path: {file_path}"
+                    f"at path: {absolute_path}"
                 )
         
         return "\n".join(context_parts)

@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from biomni_ui.config import config
 from biomni_ui.session_manager import session_manager
+from biomni_ui.output_parser import StreamingBiomniParser, clean_legacy_prefixes
 
 
 class BiomniSubprocessConfig(BaseModel):
@@ -31,6 +32,7 @@ class AsyncBiomniWrapper:
         self.session_id = session_id
         self._is_running = False
         self.session_outputs_path = session_manager.get_session_outputs_path(session_id)
+        self.output_parser = StreamingBiomniParser()
     
     def _prepare_subprocess_config(self) -> str:
         """Prepare configuration for subprocess execution."""
@@ -64,17 +66,8 @@ class AsyncBiomniWrapper:
         )
     
     def _clean_output_text(self, text: str) -> str:
-        """Clean and format output text."""
-        # Remove common prefixes for cleaner output
-        if text.startswith('[BIOMNI]'):
-            return text[8:].strip()
-        elif text.startswith('[LOG]'):
-            return text[5:].strip()
-        elif text.startswith('[RESULT]'):
-            return text[8:].strip()
-        elif text.startswith('[ERROR]'):
-            return f"ERROR: {text[7:].strip()}"
-        return text.strip()
+        """Clean and format output text using legacy prefix cleaning."""
+        return clean_legacy_prefixes(text)
     
     async def execute_query(self, query: str) -> AsyncGenerator[str, None]:
         """Execute a query asynchronously using subprocess and yield output in real-time."""
@@ -87,7 +80,7 @@ class AsyncBiomniWrapper:
             # Create and start subprocess
             process = await self._create_subprocess(query, config_json)
             
-            # Read stdout line by line
+            # Read stdout line by line and process through parser
             if process.stdout:
                 while self._is_running:
                     line = await process.stdout.readline()
@@ -98,10 +91,17 @@ class AsyncBiomniWrapper:
                     if text:
                         cleaned_text = self._clean_output_text(text)
                         if cleaned_text:
-                            yield cleaned_text + "\n"
+                            # Process through the new parser
+                            for parsed_message in self.output_parser.process_chunk(cleaned_text + "\n"):
+                                yield parsed_message
             
             # Wait for process to complete
             await process.wait()
+            
+            # Finalize the parser to get any remaining content
+            final_message = self.output_parser.finalize()
+            if final_message:
+                yield final_message
             
             # Check for errors
             if process.returncode != 0:

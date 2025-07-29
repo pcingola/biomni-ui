@@ -62,15 +62,18 @@ is there any code here that could be cleaned up? Remove all code that is not bei
 I want to reimplement how we parse the output of the model: 
 
 Rules:
-- Remove everything that is not needed. No need for splicing.
 - The parser must be simple and robust.
 - Maintain line breaks and formatting to maximize readability.
 - The parsed blocks should appear in the same order as in the original message.
+- Remove the flags and tags that not for the human.
 
 Restrictions:
 - The messages coming from the model come always after the
-`================================== Ai Message ==================================` flag. 
+`================================== Ai Message ==================================` flag.
   - Dont show anything before this flag.
-  - Split the messages accordingly.
+  - Split the messages accordingly for user readability. Every "Ai Message" should be shown as a different one for the user.
   - Code should be provided as code blocks. Solutions and observations should be cleary flagged. 
+- Inside every message you may have a <execute></execute>, <observation></observation>, <solution></solution>
+- Do a very simple formating for all this fields.
+- You will receive this text on streaming.
 ```

@@ -164,20 +164,27 @@ async def stream_response(
     response_msg: cl.Message,
     session_id: str
 ) -> None:
-    """Stream response with simple text streaming."""
+    """Stream response with parsed message handling."""
     full_response = ""
+    message_count = 0
 
-    async for output_chunk in biomni_wrapper.execute_query(user_message):
-        if not output_chunk.strip():
+    async for parsed_message in biomni_wrapper.execute_query(user_message):
+        if not parsed_message.strip():
             continue
 
-        full_response += output_chunk
+        message_count += 1
         
-        # Simple streaming - just update with accumulated content
+        # Add separator between messages if we have multiple
+        if message_count > 1:
+            full_response += "\n\n---\n\n"
+        
+        full_response += parsed_message
+        
+        # Update with accumulated parsed content
         response_msg.content = full_response.strip()
         await response_msg.update()
 
-    logger.info(f"Session {session_id}: Query completed successfully")
+    logger.info(f"Session {session_id}: Query completed successfully with {message_count} messages")
 
 
 @cl.on_chat_end
