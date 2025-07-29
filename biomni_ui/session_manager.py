@@ -3,7 +3,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any
 
 from biomni_ui.config import config
 
@@ -40,11 +39,9 @@ class SessionManager:
         # Create session directories
         outputs_path = config.get_session_outputs_path(session_id)
         uploads_path = config.get_session_uploads_path(session_id)
-        processed_path = config.get_session_processed_path(session_id)
         
         outputs_path.mkdir(parents=True, exist_ok=True)
         uploads_path.mkdir(parents=True, exist_ok=True)
-        processed_path.mkdir(parents=True, exist_ok=True)
         
         # Create session data
         session_data = SessionData(
@@ -107,10 +104,6 @@ class SessionManager:
     def get_session_uploads_path(self, session_id: str) -> Path:
         """Get the uploads path for a session."""
         return config.get_session_uploads_path(session_id)
-    
-    def get_session_processed_path(self, session_id: str) -> Path:
-        """Get the processed files path for a session."""
-        return config.get_session_processed_path(session_id)
 
 
 # Global session manager instance

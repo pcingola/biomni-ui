@@ -22,6 +22,8 @@ def main():
     
     # Set working directory to session outputs path
     session_outputs_path = Path(config['session_outputs_path'])
+    # Ensure the directory exists before changing to it
+    session_outputs_path.mkdir(parents=True, exist_ok=True)
     os.chdir(str(session_outputs_path))
     
     print(f"[BIOMNI] Starting analysis for session {session_id}", flush=True)
@@ -29,34 +31,31 @@ def main():
     print(f"[BIOMNI] Working directory: {session_outputs_path}", flush=True)
     
     try:
-        # Import Biomni here to avoid import issues if not installed
-        try:
-            from biomni.agent import A1
-            use_mock = False
-            print("[BIOMNI] Using real Biomni implementation", flush=True)
-        except ImportError:
-            print("[BIOMNI] Biomni not available, using mock implementation", flush=True)
-            # Add the parent directory to path to import mock
-            sys.path.append(str(Path(__file__).parent))
-            from mock_biomni import MockA1 as A1
-            use_mock = True
+        # Import Biomni
+        from biomni.agent import A1
+        print("[BIOMNI] Using Biomni implementation", flush=True)
         
         # Initialize agent
         biomni_data_path = config['biomni_data_path']
         
-        if use_mock:
-            agent = A1(
-                path=biomni_data_path,
-                llm=config['biomni_llm_model']
-            )
-        else:
-            agent = A1(
-                path=biomni_data_path,
-                llm=config['biomni_llm_model'],
-                timeout_seconds=config['biomni_timeout_seconds'],
-                base_url=config.get('biomni_base_url'),
-                api_key=config.get('biomni_api_key', 'EMPTY')
-            )
+        # Debug: Print configuration values
+        print(f"[DEBUG] LLM Model: {config['biomni_llm_model']}", flush=True)
+        print(f"[DEBUG] Base URL: {config.get('biomni_base_url')}", flush=True)
+        print(f"[DEBUG] API Key: {config.get('biomni_api_key', 'EMPTY')[:20]}...", flush=True)
+        
+        # Set OpenAI API key environment variable for custom models
+        api_key = config.get('biomni_api_key', 'EMPTY')
+        if api_key and api_key != 'EMPTY':
+            os.environ['OPENAI_API_KEY'] = api_key
+            print("[DEBUG] Set OPENAI_API_KEY environment variable", flush=True)
+        
+        agent = A1(
+            path=biomni_data_path,
+            llm=config['biomni_llm_model'],
+            timeout_seconds=config['biomni_timeout_seconds'],
+            base_url=config.get('biomni_base_url'),
+            api_key=api_key
+        )
         
         print("[BIOMNI] Agent initialized successfully", flush=True)
         

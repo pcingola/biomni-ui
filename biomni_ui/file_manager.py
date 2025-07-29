@@ -1,8 +1,7 @@
-import json
 import os
 import shutil
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -16,58 +15,28 @@ class FileManagerError(Exception):
 
 
 class UploadedFile:
-    """Represents an uploaded file with metadata."""
+    """Represents an uploaded file with basic metadata."""
     
-    def __init__(self, file_id: str, metadata: dict[str, Any]):
+    def __init__(self, file_id: str, original_filename: str, file_extension: str, file_size: int, session_id: str):
         self.file_id = file_id
-        self.metadata = metadata
-    
-    @property
-    def original_filename(self) -> str:
-        return self.metadata['original_filename']
-    
-    @property
-    def safe_filename(self) -> str:
-        return self.metadata['safe_filename']
-    
-    @property
-    def file_extension(self) -> str:
-        return self.metadata['file_extension']
-    
-    @property
-    def file_size(self) -> int:
-        return self.metadata['file_size']
-    
-    @property
-    def mime_type(self) -> str:
-        return self.metadata['mime_type']
-    
-    @property
-    def upload_time(self) -> datetime:
-        return datetime.fromisoformat(self.metadata['upload_time'])
-    
-    @property
-    def file_hash(self) -> str:
-        return self.metadata['file_hash']
+        self.original_filename = original_filename
+        self.file_extension = file_extension
+        self.file_size = file_size
+        self.session_id = session_id
+        self.upload_time = datetime.now()
     
     def get_file_path(self, session_id: str) -> Path:
         """Get the full path to the uploaded file."""
         uploads_dir = config.get_session_uploads_path(session_id)
         return uploads_dir / f"{self.file_id}.{self.file_extension}"
-    
-    def get_processed_path(self, session_id: str, suffix: str = "") -> Path:
-        """Get the path for processed version of the file."""
-        processed_dir = config.get_session_processed_path(session_id)
-        if suffix:
-            return processed_dir / f"{self.file_id}_{suffix}.{self.file_extension}"
-        return processed_dir / f"{self.file_id}_processed.{self.file_extension}"
 
 
 class FileManager:
-    """Manages file uploads, storage, and lifecycle for sessions."""
+    """Simple file manager for session uploads."""
     
     def __init__(self):
         self.validator = FileValidator()
+        self._session_files: dict[str, list[UploadedFile]] = {}
     
     def save_uploaded_file(self, session_id: str, file_content: bytes, 
                           original_filename: str) -> UploadedFile:
@@ -107,19 +76,21 @@ class FileManager:
             # Move file to final location
             shutil.move(str(temp_path), str(final_path))
             
-            # Create metadata
-            metadata = {
-                **validation_result,
-                'file_id': file_id,
-                'session_id': session_id,
-                'upload_time': datetime.now().isoformat(),
-                'file_path': str(final_path)
-            }
+            # Create uploaded file object
+            uploaded_file = UploadedFile(
+                file_id=file_id,
+                original_filename=validation_result['original_filename'],
+                file_extension=file_extension,
+                file_size=validation_result['file_size'],
+                session_id=session_id
+            )
             
-            # Save metadata
-            self._save_file_metadata(session_id, file_id, metadata)
+            # Store in memory
+            if session_id not in self._session_files:
+                self._session_files[session_id] = []
+            self._session_files[session_id].append(uploaded_file)
             
-            return UploadedFile(file_id, metadata)
+            return uploaded_file
             
         except Exception as e:
             # Clean up temp file if it still exists
@@ -128,60 +99,19 @@ class FileManager:
             raise FileManagerError(f"Failed to save uploaded file: {e}")
     
     def get_uploaded_file(self, session_id: str, file_id: str) -> UploadedFile | None:
-        """
-        Retrieve an uploaded file by ID.
-        
-        Args:
-            session_id: Session identifier
-            file_id: File identifier
-            
-        Returns:
-            UploadedFile or None if not found
-        """
-        metadata = self._load_file_metadata(session_id, file_id)
-        if metadata:
-            return UploadedFile(file_id, metadata)
+        """Retrieve an uploaded file by ID."""
+        session_files = self._session_files.get(session_id, [])
+        for uploaded_file in session_files:
+            if uploaded_file.file_id == file_id:
+                return uploaded_file
         return None
     
     def list_session_files(self, session_id: str) -> list[UploadedFile]:
-        """
-        List all uploaded files for a session.
-        
-        Args:
-            session_id: Session identifier
-            
-        Returns:
-            List of UploadedFile objects
-        """
-        uploads_dir = config.get_session_uploads_path(session_id)
-        metadata_file = uploads_dir / "metadata.json"
-        
-        if not metadata_file.exists():
-            return []
-        
-        try:
-            with open(metadata_file, 'r') as f:
-                all_metadata = json.load(f)
-            
-            files = []
-            for file_id, metadata in all_metadata.items():
-                files.append(UploadedFile(file_id, metadata))
-            
-            return files
-        except (json.JSONDecodeError, IOError):
-            return []
+        """List all uploaded files for a session."""
+        return self._session_files.get(session_id, [])
     
     def delete_file(self, session_id: str, file_id: str) -> bool:
-        """
-        Delete an uploaded file and its metadata.
-        
-        Args:
-            session_id: Session identifier
-            file_id: File identifier
-            
-        Returns:
-            bool: True if file was deleted, False if not found
-        """
+        """Delete an uploaded file."""
         uploaded_file = self.get_uploaded_file(session_id, file_id)
         if not uploaded_file:
             return False
@@ -192,26 +122,23 @@ class FileManager:
             if file_path.exists():
                 file_path.unlink()
             
-            # Delete processed files
-            processed_dir = config.get_session_processed_path(session_id)
-            if processed_dir.exists():
-                for processed_file in processed_dir.glob(f"{file_id}_*"):
-                    processed_file.unlink()
-            
-            # Remove from metadata
-            self._remove_file_metadata(session_id, file_id)
+            # Remove from memory
+            if session_id in self._session_files:
+                self._session_files[session_id] = [
+                    f for f in self._session_files[session_id] if f.file_id != file_id
+                ]
             
             return True
         except Exception:
             return False
     
     def cleanup_session_files(self, session_id: str) -> None:
-        """
-        Clean up all files for a session.
+        """Clean up all files for a session."""
+        # Remove from memory
+        if session_id in self._session_files:
+            del self._session_files[session_id]
         
-        Args:
-            session_id: Session identifier
-        """
+        # Remove from disk
         session_path = config.get_session_data_path() / session_id
         if session_path.exists():
             try:
@@ -219,48 +146,8 @@ class FileManager:
             except Exception:
                 pass  # Best effort cleanup
     
-    def cleanup_expired_files(self) -> int:
-        """
-        Clean up files that have exceeded retention period.
-        
-        Returns:
-            int: Number of files cleaned up
-        """
-        if config.file_retention_hours <= 0:
-            return 0
-        
-        cutoff_time = datetime.now() - timedelta(hours=config.file_retention_hours)
-        cleaned_count = 0
-        
-        sessions_dir = config.get_session_data_path()
-        if not sessions_dir.exists():
-            return 0
-        
-        for session_dir in sessions_dir.iterdir():
-            if not session_dir.is_dir():
-                continue
-            
-            session_id = session_dir.name
-            files = self.list_session_files(session_id)
-            
-            for uploaded_file in files:
-                if uploaded_file.upload_time < cutoff_time:
-                    if self.delete_file(session_id, uploaded_file.file_id):
-                        cleaned_count += 1
-        
-        return cleaned_count
-    
     def get_file_content(self, session_id: str, file_id: str) -> bytes | None:
-        """
-        Get the raw content of an uploaded file.
-        
-        Args:
-            session_id: Session identifier
-            file_id: File identifier
-            
-        Returns:
-            bytes: File content or None if not found
-        """
+        """Get the raw content of an uploaded file."""
         uploaded_file = self.get_uploaded_file(session_id, file_id)
         if not uploaded_file:
             return None
@@ -275,13 +162,28 @@ class FileManager:
         except IOError:
             return None
     
+    def get_file_context_for_query(self, session_id: str, uploaded_files: list[UploadedFile]) -> str:
+        """Generate context string about uploaded files for inclusion in queries."""
+        if not uploaded_files:
+            return ""
+        
+        context_parts = ["Available uploaded files:"]
+        
+        for uploaded_file in uploaded_files:
+            file_path = uploaded_file.get_file_path(session_id)
+            if file_path.exists():
+                context_parts.append(
+                    f"- {uploaded_file.original_filename} "
+                    f"({uploaded_file.file_extension.upper()}, {uploaded_file.file_size} bytes) "
+                    f"at path: {file_path}"
+                )
+        
+        return "\n".join(context_parts)
+    
     def _ensure_session_directories(self, session_id: str) -> None:
         """Ensure all required directories exist for a session."""
         uploads_dir = config.get_session_uploads_path(session_id)
-        processed_dir = config.get_session_processed_path(session_id)
-        
         uploads_dir.mkdir(parents=True, exist_ok=True)
-        processed_dir.mkdir(parents=True, exist_ok=True)
     
     def _create_temp_file(self, content: bytes, filename: str) -> Path:
         """Create a temporary file for validation."""
@@ -300,62 +202,3 @@ class FileManager:
             raise
         
         return Path(temp_path)
-    
-    def _save_file_metadata(self, session_id: str, file_id: str, metadata: dict[str, Any]) -> None:
-        """Save file metadata to session metadata file."""
-        uploads_dir = config.get_session_uploads_path(session_id)
-        metadata_file = uploads_dir / "metadata.json"
-        
-        # Load existing metadata
-        all_metadata = {}
-        if metadata_file.exists():
-            try:
-                with open(metadata_file, 'r') as f:
-                    all_metadata = json.load(f)
-            except (json.JSONDecodeError, IOError):
-                all_metadata = {}
-        
-        # Add new metadata
-        all_metadata[file_id] = metadata
-        
-        # Save updated metadata
-        try:
-            with open(metadata_file, 'w') as f:
-                json.dump(all_metadata, f, indent=2)
-        except IOError as e:
-            raise FileManagerError(f"Cannot save file metadata: {e}")
-    
-    def _load_file_metadata(self, session_id: str, file_id: str) -> dict[str, Any] | None:
-        """Load metadata for a specific file."""
-        uploads_dir = config.get_session_uploads_path(session_id)
-        metadata_file = uploads_dir / "metadata.json"
-        
-        if not metadata_file.exists():
-            return None
-        
-        try:
-            with open(metadata_file, 'r') as f:
-                all_metadata = json.load(f)
-            return all_metadata.get(file_id)
-        except (json.JSONDecodeError, IOError):
-            return None
-    
-    def _remove_file_metadata(self, session_id: str, file_id: str) -> None:
-        """Remove metadata for a specific file."""
-        uploads_dir = config.get_session_uploads_path(session_id)
-        metadata_file = uploads_dir / "metadata.json"
-        
-        if not metadata_file.exists():
-            return
-        
-        try:
-            with open(metadata_file, 'r') as f:
-                all_metadata = json.load(f)
-            
-            if file_id in all_metadata:
-                del all_metadata[file_id]
-                
-                with open(metadata_file, 'w') as f:
-                    json.dump(all_metadata, f, indent=2)
-        except (json.JSONDecodeError, IOError):
-            pass  # Best effort removal

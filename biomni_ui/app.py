@@ -1,7 +1,5 @@
 import asyncio
 import logging
-import re
-import tiktoken
 from pathlib import Path
 
 import chainlit as cl
@@ -9,7 +7,6 @@ import chainlit as cl
 from biomni_ui.biomni_wrapper import AsyncBiomniWrapper
 from biomni_ui.config import config
 from biomni_ui.file_manager import FileManager, FileManagerError
-from biomni_ui.file_processor import FileProcessor
 from biomni_ui.file_validator import FileValidationError
 from biomni_ui.session_manager import session_manager
 
@@ -20,15 +17,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Initialize tokenizer for LLM token counting
-tokenizer = tiktoken.get_encoding("cl100k_base")
-
-# Define a pattern to split text into sentences for better streaming
-SENTENCE_END_PATTERN = re.compile(r"[.!?\n]")
-
-# Initialize file manager and processor
+# Initialize file manager
 file_manager = FileManager()
-file_processor = FileProcessor()
 
 
 @cl.on_chat_start
@@ -73,66 +63,55 @@ Please ask your question and I will use specialized tools and knowledge to assis
         await cl.Message(content=f"Error starting session: {str(e)}").send()
 
 
-@cl.on_file_upload(accept=config.allowed_file_types if config.file_upload_enabled else [])
-async def handle_file_upload(files: list[cl.File]):
-    """Handle file uploads from users."""
+async def handle_file_attachments(elements: list, session_id: str):
+    """Handle file attachments from message elements."""
     if not config.file_upload_enabled:
         await cl.Message(content="File upload is currently disabled.").send()
-        return
-    
-    session_id = cl.user_session.get("session_id")
-    if not session_id:
-        await cl.Message(content="Session not found. Please refresh the page.").send()
         return
     
     uploaded_files = []
     errors = []
     
-    for file in files:
+    for element in elements:
         try:
-            # Ensure file content is bytes
-            file_content = file.content
-            if isinstance(file_content, str):
-                file_content = file_content.encode('utf-8')
-            elif file_content is None:
+            # Read file content from the element's path
+            with open(element.path, "rb") as f:
+                file_content = f.read()
+            
+            if not file_content:
                 raise FileValidationError("File content is empty")
             
             # Save the uploaded file
             uploaded_file = file_manager.save_uploaded_file(
                 session_id=session_id,
                 file_content=file_content,
-                original_filename=file.name
+                original_filename=element.name
             )
             
             # Add to session tracking
             session_manager.add_uploaded_file(session_id, uploaded_file.file_id)
             
             uploaded_files.append(uploaded_file)
-            logger.info(f"File uploaded successfully: {file.name} (ID: {uploaded_file.file_id})")
+            logger.info(f"File uploaded successfully: {element.name} (ID: {uploaded_file.file_id})")
             
         except (FileValidationError, FileManagerError) as e:
-            error_msg = f"Failed to upload {file.name}: {str(e)}"
+            error_msg = f"Failed to upload {element.name}: {str(e)}"
             errors.append(error_msg)
             logger.error(error_msg)
         except Exception as e:
-            error_msg = f"Unexpected error uploading {file.name}: {str(e)}"
+            error_msg = f"Unexpected error uploading {element.name}: {str(e)}"
             errors.append(error_msg)
             logger.error(error_msg)
     
     # Send feedback to user
     if uploaded_files:
         file_list = "\n".join([
-            f"✅ **{f.original_filename}** ({f.file_extension.upper()}, {f.file_size:,} bytes)"
+            f"**{f.original_filename}** ({f.file_extension.upper()}, {f.file_size:,} bytes)"
             for f in uploaded_files
         ])
         
         success_msg = f"Successfully uploaded {len(uploaded_files)} file(s):\n\n{file_list}"
-        
-        if len(uploaded_files) == 1:
-            success_msg += f"\n\nYou can now ask questions about this file, and I'll analyze it using appropriate biomedical tools."
-        else:
-            success_msg += f"\n\nYou can now ask questions about these files, and I'll analyze them using appropriate biomedical tools."
-        
+
         await cl.Message(content=success_msg).send()
     
     if errors:
@@ -150,15 +129,19 @@ async def main(message: cl.Message):
         await cl.Message(content="Session not found. Please refresh the page.").send()
         return
 
-    user_message = message.content.strip()
+    user_message = message.content
     logger.info(f"Session {session_id}: User message received")
+
+    # Handle file attachments if present
+    if config.file_upload_enabled and message.elements:
+        await handle_file_attachments(message.elements, session_id)
 
     # Add file context if files are uploaded
     enhanced_message = user_message
     if config.file_upload_enabled:
         uploaded_files = file_manager.list_session_files(session_id)
         if uploaded_files:
-            file_context = file_processor.get_file_context_for_query(session_id, uploaded_files)
+            file_context = file_manager.get_file_context_for_query(session_id, uploaded_files)
             enhanced_message = f"{file_context}\n\nUser query: {user_message}"
             logger.info(f"Session {session_id}: Added context for {len(uploaded_files)} uploaded files")
 
@@ -166,6 +149,7 @@ async def main(message: cl.Message):
     await response_msg.send()
 
     try:
+        # Stream response with simple text streaming
         await stream_response(enhanced_message, biomni_wrapper, response_msg, session_id)
     except Exception as e:
         error_msg = f"Error: {str(e)}"
@@ -178,33 +162,18 @@ async def stream_response(
     user_message: str,
     biomni_wrapper,
     response_msg: cl.Message,
-    session_id: str,
-    token_threshold: int = 30
+    session_id: str
 ) -> None:
-    """Stream response in semantically complete slices."""
+    """Stream response with simple text streaming."""
     full_response = ""
-    current_chunk = ""
-    tokens_since_last_update = 0
 
     async for output_chunk in biomni_wrapper.execute_query(user_message):
         if not output_chunk.strip():
             continue
 
-        current_chunk += output_chunk
-        tokens_in_chunk = len(tokenizer.encode(output_chunk))
-        tokens_since_last_update += tokens_in_chunk
-
-        # If sentence-ending punctuation is found and token threshold reached
-        if SENTENCE_END_PATTERN.search(current_chunk) and tokens_since_last_update >= token_threshold:
-            full_response += current_chunk
-            response_msg.content = full_response + "▌"
-            await response_msg.update()
-            current_chunk = ""
-            tokens_since_last_update = 0
-
-    # Final update
-    if current_chunk:
-        full_response += current_chunk
+        full_response += output_chunk
+        
+        # Simple streaming - just update with accumulated content
         response_msg.content = full_response.strip()
         await response_msg.update()
 

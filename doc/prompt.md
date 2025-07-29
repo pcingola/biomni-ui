@@ -57,3 +57,20 @@ This code is supposed to, when the user submits a message, run a call to the age
 ```text
 is there any code here that could be cleaned up? Remove all code that is not being used, its overcomplicated or it's not part of a core feature for the MVP
 ```
+
+```text
+I want to reimplement how we parse the output of the model: 
+
+Rules:
+- Remove everything that is not needed. No need for splicing.
+- The parser must be simple and robust.
+- Maintain line breaks and formatting to maximize readability.
+- The parsed blocks should appear in the same order as in the original message.
+
+Restrictions:
+- The messages coming from the model come always after the
+`================================== Ai Message ==================================` flag. 
+  - Dont show anything before this flag.
+  - Split the messages accordingly.
+  - Code should be provided as code blocks. Solutions and observations should be cleary flagged. 
+```
