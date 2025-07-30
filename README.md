@@ -1,6 +1,12 @@
 # Biomni UI
 
-A Chainlit-based user interface for Biomni with async execution and session management.
+A web-based interface for the Biomni biomedical AI agent that provides an intuitive chat interface for biomedical research tasks, data analysis, and file processing.
+
+> **⚠️ MVP Status**: This project is currently in MVP (Minimum Viable Product) status. Features and APIs may change as development continues.
+
+## Description
+
+Biomni UI transforms the powerful Biomni command-line tool into an accessible web application. It enables researchers to interact with biomedical AI through a simple chat interface, upload various file types for analysis, and manage research sessions with automatic file tracking and output generation.
 
 ## Features
 
@@ -48,31 +54,33 @@ cp biomni_ui/.env.example .env
 
 ## Configuration
 
-Copy `biomni_ui/.env.example` to `.env` and configure the following variables:
+Copy `.env.example` to `.env` and configure the following variables:
 
 ### Required
-- `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `CUSTOM`: API keys for LLM access
+- `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`: API keys for LLM access
 
 ### Optional
-- `BIOMNI_LLM_MODEL`: LLM model to use (default: claude-sonnet-4-20250514)
-- `BIOMNI_DATA_PATH`: Path to Biomni data directory (default: ~/biomni-ui-data/biomni_data)
+- `BIOMNI_LLM_MODEL`: LLM model to use (default: anthropic/claude-sonnet-4)
+- `BIOMNI_DATA_PATH`: Path to Biomni data directory (default: ./data)
 - `SESSION_DATA_PATH`: Path to session data directory (default: ~/biomni-ui-data/sessions)
 - `CHAINLIT_PORT`: Port for the web interface (default: 8000)
+- `CHAINLIT_HOST`: Host for the web interface (default: 0.0.0.0)
 - `LOG_LEVEL`: Logging level (default: INFO)
+- `BIOMNI_TIMEOUT_SECONDS`: Timeout for Biomni operations (default: 600)
+- `BIOMNI_MOCK_MODE`: Use mock mode for testing (default: false)
 
-### File Upload (Optional)
+### File Upload
 - `FILE_UPLOAD_ENABLED`: Enable file upload functionality (default: true)
 - `MAX_FILE_SIZE_MB`: Maximum file size in MB (default: 100)
-- `FILE_RETENTION_HOURS`: Hours to retain uploaded files (default: 24)
-- `ENABLE_FILE_SCANNING`: Enable virus scanning (default: false)
 
 ## Usage
 
-### With Full Biomni Setup
+### Quick Start
 
-1. Activate the Biomni conda environment:
+1. Configure your environment:
 ```bash
-conda activate biomni_e1
+cp .env.example .env
+# Edit .env with your API keys
 ```
 
 2. Start the application:
@@ -82,52 +90,22 @@ conda activate biomni_e1
 
 3. Open your browser and navigate to `http://localhost:8000`
 
-4. Start asking biomedical questions and get responses from Biomni
+4. Start asking biomedical questions and upload files for analysis
 
-### File Upload Usage
+### File Upload
 
-The interface supports uploading various file types for analysis:
+Upload files by dragging and dropping into the chat interface or using the upload button.
 
-**Supported File Types:**
-- **Documents**: PDF, DOCX, TXT, MD
-- **Images**: PNG, JPG, TIFF, BMP, GIF
-- **Data**: CSV, TSV, JSON, XML, YAML, Excel files
-- **Bioinformatics**: FASTA, FASTQ, BED, VCF, GFF, GTF
+**Supported formats**: PDF, DOCX, TXT, MD, PNG, JPG, TIFF, CSV, TSV, JSON, XML, YAML, Excel, FASTA, FASTQ, BED, VCF, GFF, GTF
 
-**How to Upload:**
-1. Drag and drop files into the chat interface, or
-2. Use the file upload button
-3. Files are automatically validated and made available to Biomni
-4. Ask questions about your uploaded files
+**Example workflow**:
+1. Upload `experiment_data.csv`
+2. Ask: "Analyze this experimental data and identify significant patterns"
+3. View generated plots and analysis files
 
-**Example:**
-```
-Upload: experiment_data.csv
-Query: "Analyze this experimental data and identify any significant patterns"
-```
+### Development Mode
 
-See [`doc/file_upload.md`](doc/file_upload.md) for detailed documentation.
-
-### Testing with Mock (No Biomni Required)
-
-For local testing without the full Biomni setup:
-
-1. Install dependencies:
-```bash
-uv sync
-```
-
-2. Create a minimal `.env` file:
-```bash
-echo "BIOMNI_DATA_PATH=/tmp/mock-biomni-data" > .env
-```
-
-3. Run the full UI with mock:
-```bash
-./scripts/run.sh
-```
-
-The system will automatically detect that Biomni is not available and use the mock implementation instead.
+For testing without full Biomni setup, set `BIOMNI_MOCK_MODE=true` in your `.env` file.
 
 ## Architecture
 
