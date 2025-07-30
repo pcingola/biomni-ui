@@ -8,8 +8,10 @@ import os
 import json
 from pathlib import Path
 
+
 from biomni.agent import A1
 from biomni.utils import pretty_print
+
 from langchain_core.messages import HumanMessage
 
 

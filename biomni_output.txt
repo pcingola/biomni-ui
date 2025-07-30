@@ -134,17 +134,57 @@ plt.title('Number of Genes per Chromosome', fontsize=16, fontweight='bold', pad=
 plt.xlabel('Chromosome', fontsize=12, fontweight='bold')
 plt.ylabel('Number of Genes', fontsize=12, fontweight='bold')
 
+
 # Set x-axis labels
 plt.xticks(range(len(df)), df['chromosome'], rotation=45, ha='right')
+=======
+<execute>
+# Let's check the gene information data lake
+import pandas as pd
+import os
 
-# Add grid for better readability
-plt.grid(axis='y', alpha=0.3, linestyle='--')
+print("=== Checking gene information data lake ===")
+data_lake_path = "/Users/user_name/Projects/personal/Biomni/data/biomni_data/data_lake"
+gene_info_path = os.path.join(data_lake_path, "gene_info.parquet")
 
-# Add value labels on top of bars for better readability
-for i, bar in enumerate(bars):
-    height = bar.get_height()
-    plt.text(bar.get_x() + bar.get_width()/2., height + 50,
-             f'{int(height)}', ha='center', va='bottom', fontsize=9, rotation=90)
+if os.path.exists(gene_info_path):
+    gene_info = pd.read_parquet(gene_info_path)
+    print(f"Gene info dataset shape: {gene_info.shape}")
+    print(f"Columns: {list(gene_info.columns)}")
+    
+    # Search for SRY gene
+    sry_matches = gene_info[gene_info['Symbol'].str.upper() == 'SRY'] if 'Symbol' in gene_info.columns else None
+    if sry_matches is not None and len(sry_matches) > 0:
+        print("\n=== SRY gene found in database ===")
+        print(sry_matches.to_string())
+    else:
+        # Try alternative column names
+        for col in gene_info.columns:
+           
+           if 'gene' in col.lower() or 'symbol' in col.lower() or 'name' in col.lower():
+                print(f"Checking column: {col}")
+                matches = gene_info[gene_info[col].astype(str).str.upper().str.contains('SRY', na=False)]
+                if len(matches) > 0:
+                    print(f"Found SRY matches in column {col}:")
+                    print(matches.head())
+                    break
+else:
+    print("Gene info file not found")
+</execute>
+================================== Ai Message ==================================
+
+<observation>=== Checking gene information data lake ===
+Gene info dataset shape: (63086, 13)
+Columns: ['gene_id', 'transcript_id', 'chr', 'gene_start', 'gene_end', 'strand', 'transcript_start', 'transcript_end', 'tss', 'transcript_is_canonical', 'gene_name', 'percentage_gene_gc_content', 'gene_type']
+Checking column: gene_id
+Checking column: gene_start
+Checking column: gene_end
+Checking column: gene_name
+Found SRY matches in column gene_name:
+               gene_id    transcript_id chr  gene_start  gene_end  strand  transcript_start  transcript_end      tss  transcript_is_canonical gene_name  percentage_gene_gc_content       gene_type
+62770  ENSG00000184895  ENST00000383070   Y     2786855   2787682      -1           2786855         2787682  2787682                      1.0       SRY                       46.62  protein_coding
+</observation>
+================================== Ai Message ==================================
 
 # Adjust layout to prevent label cutoff
 plt.tight_layout()
