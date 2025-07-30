@@ -15,6 +15,7 @@ class BlockType(Enum):
     CODE = "code"
     OBSERVATION = "observation"
     SOLUTION = "solution"
+    FILE = "file"
 
 
 @dataclass
@@ -23,6 +24,14 @@ class ContentBlock:
     type: BlockType
     content: str
     raw_content: str = ""
+
+
+@dataclass
+class FileInfo:
+    """Represents information about a generated file."""
+    path: str
+    file_type: str
+    description: str
 
 
 class BiomniOutputParser:
@@ -34,6 +43,7 @@ class BiomniOutputParser:
     def __init__(self):
         self.buffer = ""
         self.parsed_messages: List[str] = []
+        self.generated_files: List[FileInfo] = []
         
     def add_chunk(self, chunk: str) -> Generator[str, None, None]:
         """
@@ -149,6 +159,9 @@ class BiomniOutputParser:
                 formatted_blocks.append(self._format_observation_block(block.content))
             elif block.type == BlockType.SOLUTION:
                 formatted_blocks.append(self._format_solution_block(block.content))
+            elif block.type == BlockType.FILE:
+                # Extract file info and add formatted file block to output
+                self._extract_file_info(block.content)
         
         return "\n\n".join(formatted_blocks).strip()
     
@@ -165,8 +178,8 @@ class BiomniOutputParser:
         blocks = []
         current_pos = 0
         
-        # Pattern to match XML tags
-        xml_pattern = r'<(execute|observation|solution)>(.*?)</\1>'
+        # Pattern to match XML tags (simple version for file tags with attributes)
+        xml_pattern = r'<(execute|observation|solution|file)([^>]*)>(.*?)</\1>'
         
         for match in re.finditer(xml_pattern, content, re.DOTALL):
             # Add text before the XML tag as a text block
@@ -180,7 +193,8 @@ class BiomniOutputParser:
             
             # Add the XML content as appropriate block type
             tag_name = match.group(1)
-            tag_content = match.group(2).strip()
+            attributes = match.group(2).strip()
+            tag_content = match.group(3).strip()
             
             if tag_name == "execute":
                 block_type = BlockType.CODE
@@ -188,14 +202,25 @@ class BiomniOutputParser:
                 block_type = BlockType.OBSERVATION
             elif tag_name == "solution":
                 block_type = BlockType.SOLUTION
+            elif tag_name == "file":
+                block_type = BlockType.FILE
             else:
                 block_type = BlockType.TEXT
             
-            blocks.append(ContentBlock(
-                type=block_type,
-                content=tag_content,
-                raw_content=match.group(0)
-            ))
+            # For file tags, store attributes in the content for later parsing
+            if tag_name == "file":
+                content_with_attrs = f"{attributes}|{tag_content}"
+                blocks.append(ContentBlock(
+                    type=block_type,
+                    content=content_with_attrs,
+                    raw_content=match.group(0)
+                ))
+            else:
+                blocks.append(ContentBlock(
+                    type=block_type,
+                    content=tag_content,
+                    raw_content=match.group(0)
+                ))
             
             current_pos = match.end()
         
@@ -229,15 +254,36 @@ class BiomniOutputParser:
         
         code_content = '\n'.join(cleaned_lines).strip()
         
-        return f"**🔧 Code Execution:**\n\n```python\n{code_content}\n```"
+        return f"**Code Execution:**\n\n```python\n{code_content}\n```"
     
     def _format_observation_block(self, content: str) -> str:
         """Format observation content."""
-        return f"**📊 Observation:**\n\n{content}"
+        return f"**Observation:**\n\n{content}"
     
     def _format_solution_block(self, content: str) -> str:
         """Format solution content."""
-        return f"**✅ Solution:**\n\n{content}"
+        return f"**Solution:**\n\n{content}"
+    
+    def _extract_file_info(self, content: str) -> None:
+        """Extract file information from file block content."""
+        # Parse attributes and description from content
+        if '|' in content:
+            attributes_str, description = content.split('|', 1)
+        else:
+            attributes_str, description = content, ""
+        
+        # Extract filename and type from attributes
+        import re
+        path_match = re.search(r'path=["\']([^"\']+)["\']', attributes_str)
+        type_match = re.search(r'type=["\']([^"\']+)["\']', attributes_str)
+        
+        filename = path_match.group(1) if path_match else "unknown_file"
+        file_type = type_match.group(1) if type_match else "unknown"
+        
+        # Store file info for later use
+        file_info = FileInfo(path=filename, file_type=file_type, description=description.strip())
+        self.generated_files.append(file_info)
+    
 
 
 class StreamingBiomniParser:
@@ -273,6 +319,10 @@ class StreamingBiomniParser:
     def finalize(self) -> str | None:
         """Finalize parsing and return any remaining content."""
         return self.parser.finalize()
+    
+    def get_generated_files(self) -> List[FileInfo]:
+        """Get list of files that were generated during parsing."""
+        return self.parser.generated_files
 
 
 def parse_biomni_output(raw_output: str) -> List[str]:

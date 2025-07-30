@@ -19,6 +19,7 @@ class Config(BaseSettings):
     biomni_timeout_seconds: int = Field(default=600, description="Timeout for Biomni operations in seconds")
     biomni_base_url: str | None = Field(default=None, description="Custom base URL for Biomni LLM")
     biomni_api_key: str = Field(default="EMPTY", description="API key for custom Biomni LLM")
+    biomni_mock_mode: bool = Field(default=False, description="Use mock mode to read from biomni_output.txt instead of executing Biomni")
     
     # UI Configuration
     session_data_path: str = Field(default_factory=lambda: str(Path.home() / "biomni-ui-data" / "sessions"), description="Path to session data directory")

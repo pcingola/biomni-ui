@@ -1,6 +1,8 @@
 import asyncio
 import json
+import logging
 import sys
+import time
 from pathlib import Path
 from typing import AsyncGenerator
 from pydantic import BaseModel
@@ -8,6 +10,9 @@ from pydantic import BaseModel
 from biomni_ui.config import config
 from biomni_ui.session_manager import session_manager
 from biomni_ui.output_parser import StreamingBiomniParser, clean_legacy_prefixes
+
+# Configure logger for this module
+logger = logging.getLogger(__name__)
 
 
 class BiomniSubprocessConfig(BaseModel):
@@ -69,8 +74,70 @@ class AsyncBiomniWrapper:
         """Clean and format output text using legacy prefix cleaning."""
         return clean_legacy_prefixes(text)
     
+    async def _execute_mock_query(self, query: str) -> AsyncGenerator[str, None]:
+        """Execute a mock query by reading from biomni_output.txt file."""
+        self._is_running = True
+        
+        try:
+            # Path to the mock output file
+            mock_file_path = Path("biomni_output.txt")
+            
+            if not mock_file_path.exists():
+                logger.error(f"[{self.session_id}][MOCK] Mock file not found: {mock_file_path}")
+                yield f"ERROR: Mock file not found: {mock_file_path}\n"
+                return
+            
+            logger.info(f"[{self.session_id}][MOCK] Reading from mock file: {mock_file_path}")
+            yield f"[MOCK MODE] Reading from {mock_file_path}\n"
+            yield f"[MOCK MODE] Query: {query}\n"
+            
+            # Read the file content
+            with open(mock_file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Split content into lines and simulate streaming
+            lines = content.split('\n')
+            
+            for line in lines:
+                if not self._is_running:
+                    break
+                
+                if line.strip():  # Skip empty lines
+                    # Log the mock output
+                    logger.info(f"[{self.session_id}][MOCK]: {line}")
+                    
+                    cleaned_text = self._clean_output_text(line)
+                    if cleaned_text:
+                        # Process through the parser
+                        for parsed_message in self.output_parser.process_chunk(cleaned_text + "\n"):
+                            yield parsed_message
+                
+                # Add a small delay to simulate real-time streaming
+                await asyncio.sleep(0.01)
+            
+            # Finalize the parser to get any remaining content
+            final_message = self.output_parser.finalize()
+            if final_message:
+                yield final_message
+                
+            logger.info(f"[{self.session_id}][MOCK] Mock execution completed")
+            yield "[MOCK MODE] Execution completed\n"
+                
+        except Exception as e:
+            logger.error(f"[{self.session_id}][MOCK] Exception: {str(e)}")
+            yield f"ERROR: {str(e)}\n"
+        finally:
+            self._is_running = False
+    
     async def execute_query(self, query: str) -> AsyncGenerator[str, None]:
         """Execute a query asynchronously using subprocess and yield output in real-time."""
+        # Check if mock mode is enabled
+        if config.biomni_mock_mode:
+            logger.info(f"[{self.session_id}] Mock mode enabled, using mock execution")
+            async for message in self._execute_mock_query(query):
+                yield message
+            return
+        
         self._is_running = True
         
         try:
@@ -89,6 +156,9 @@ class AsyncBiomniWrapper:
                     
                     text = line.decode('utf-8').rstrip('\r\n')
                     if text:
+                        # Log the raw stdout output
+                        logger.info(f"[{self.session_id}][BIOMNI]: {text}")
+                        
                         cleaned_text = self._clean_output_text(text)
                         if cleaned_text:
                             # Process through the new parser
@@ -109,10 +179,14 @@ class AsyncBiomniWrapper:
                     stderr_output = await process.stderr.read()
                     error_text = stderr_output.decode('utf-8').strip()
                     if error_text:
+                        # Log the stderr output
+                        logger.error(f"[{self.session_id}][BIOMNI]: {error_text}")
                         yield f"ERROR: {error_text}\n"
+                logger.error(f"[{self.session_id}][BIOMNI] Process failed with exit code {process.returncode}")
                 yield f"ERROR: Process failed with exit code {process.returncode}\n"
                 
         except Exception as e:
+            logger.error(f"[{self.session_id}][BIOMNI] Exception: {str(e)}")
             yield f"ERROR: {str(e)}\n"
         finally:
             self._is_running = False

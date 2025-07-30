@@ -136,14 +136,46 @@ async def main(message: cl.Message):
     if config.file_upload_enabled and message.elements:
         await handle_file_attachments(message.elements, session_id)
 
-    # Add file context if files are uploaded
+    # Add system instructions and file context
     enhanced_message = user_message
+    
+    # Add general system instructions with output path
+    session_outputs_path = session_manager.get_session_outputs_path(session_id)
+    system_instructions = """
+SYSTEM INSTRUCTIONS:
+1. File Generation: When you create any files, use this format:
+   <file path="filename.ext" type="filetype">description</file>
+   
+   Supported types: data, image, notebook, report, genomic
+   Examples:
+   - <file path="results.csv" type="data">Analysis results</file>
+   - <file path="plot.png" type="image">Visualization</file>
+   - <file path="analysis.ipynb" type="notebook">Complete analysis</file>
+   
+   - Only provide the files that are relevant to the user.
+   - Only print file tags when files are actually generated.
+   - Add a <solution></solution> block after the file tags providing info about the file.
+
+2. Display Rules:
+   - DO NOT use plt.show(), display(), or similar commands to show plots
+   - Save all plots to files instead (e.g., plt.savefig('filename.png'))
+   - The UI will automatically display generated files
+
+3. Analysis Summary:
+   - Always generate a Jupyter notebook as the last step to summarize the analysis
+   - Include all key findings, visualizations, and conclusions in the notebook
+"""
+    
     if config.file_upload_enabled:
         uploaded_files = file_manager.list_session_files(session_id)
         if uploaded_files:
             file_context = file_manager.get_file_context_for_query(session_id, uploaded_files)
-            enhanced_message = f"{file_context}\n\nUser query: {user_message}"
+            enhanced_message = f"{system_instructions}{file_context}\n\nUser query: {user_message}"
             logger.info(f"Session {session_id}: Added context for {len(uploaded_files)} uploaded files")
+        else:
+            enhanced_message = f"{system_instructions}User query: {user_message}"
+    else:
+        enhanced_message = f"{system_instructions}User query: {user_message}"
 
     response_msg = cl.Message(content="Processing...")
     await response_msg.send()
@@ -184,7 +216,58 @@ async def stream_response(
         response_msg.content = full_response.strip()
         await response_msg.update()
 
+    # After streaming is complete, check for generated files
+    generated_files = biomni_wrapper.output_parser.get_generated_files()
+    if generated_files:
+        await display_generated_files(generated_files, session_id)
+
     logger.info(f"Session {session_id}: Query completed successfully with {message_count} messages")
+
+
+async def display_generated_files(generated_files, session_id: str):
+    """Display generated files using Chainlit's file display capabilities."""
+    elements = []
+    sent = []
+        
+    for file_info in generated_files:
+        
+        # Skip if we've already sent this file to avoid duplicates
+        if file_info.path in sent:       
+            continue
+        sent.append(file_info.path)
+        
+        file_path = Path(config.session_data_path) / session_id / "outputs" / file_info.path
+                
+        # Check if file actually exists
+        if file_path.exists():
+            file_size = file_path.stat().st_size
+            logger.info(f"Session {session_id}: File exists, size: {file_size} bytes")
+            
+            try:
+                # Determine the appropriate Chainlit element type
+                if file_info.file_type == "image" or file_path.suffix.lower() in ['.png', '.jpg', '.jpeg', '.svg']:
+                    logger.info(f"Session {session_id}: Creating image element for {file_info.path}")
+                    element = cl.Image(path=str(file_path), name=file_info.path, display="inline")
+                else:
+                    logger.info(f"Session {session_id}: Creating file element for {file_info.path}")
+                    element = cl.File(path=str(file_path), name=file_info.path, display="inline")
+                
+                elements.append(element)
+                logger.info(f"Session {session_id}: Successfully created element for {file_info.path}")
+            except Exception as e:
+                logger.error(f"Session {session_id}: Error creating element for file {file_path}: {e}")
+        else:
+            logger.warning(f"Session {session_id}: File does not exist: {file_path}")
+    
+    # Send files as a separate message if any were found
+    if elements:
+        logger.info(f"Session {session_id}: Sending message with {len(elements)} elements")
+        await cl.Message(
+            content=f"📁 **Generated {len(elements)} file(s):**",
+            elements=elements
+        ).send()
+    else:
+        logger.warning(f"Session {session_id}: No elements to display")
 
 
 @cl.on_chat_end
