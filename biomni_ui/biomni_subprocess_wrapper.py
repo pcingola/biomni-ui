@@ -8,8 +8,10 @@ import os
 import json
 from pathlib import Path
 
-from Biomni.biomni.agent.a1 import A1
-from Biomni.biomni.utils import pretty_print
+
+from biomni.agent import A1
+from biomni.utils import pretty_print
+
 from langchain_core.messages import HumanMessage
 
 
@@ -109,100 +111,40 @@ def main():
     # Parse config
     config = json.loads(config_json)
     
-    # Set working directory to session outputs path
+    # The subprocess is already started with the correct working directory (cwd parameter in biomni_wrapper.py)
+    # so we don't need to change directory again. Just ensure the directory exists.
     session_outputs_path = Path(config['session_outputs_path'])
-    # Ensure the directory exists before changing to it
     session_outputs_path.mkdir(parents=True, exist_ok=True)
-    os.chdir(str(session_outputs_path))
+    
+    # Verify we're in the correct directory (should already be set by subprocess cwd parameter)
+    current_cwd = Path.cwd()
+    print(f"[BIOMNI] Current working directory: {current_cwd}", flush=True)
     
     print(f"[BIOMNI] Starting analysis for session {session_id}", flush=True)
     print(f"[BIOMNI] Query: {query}", flush=True)
     print(f"[BIOMNI] Working directory: {session_outputs_path}", flush=True)
     
     try:
-        # Import Biomni
-        from biomni.agent import A1
-        print("[BIOMNI] Using Biomni implementation", flush=True)
-        
-        # Initialize agent
-        biomni_data_path = config['biomni_data_path']
-        
-        # Debug: Print configuration values
-        print(f"[DEBUG] LLM Model: {config['biomni_llm_model']}", flush=True)
-        print(f"[DEBUG] Base URL: {config.get('biomni_base_url')}", flush=True)
-        print(f"[DEBUG] API Key: {config.get('biomni_api_key', 'EMPTY')[:20]}...", flush=True)
-        
-        # Set OpenAI API key environment variable for custom models
-        api_key = config.get('biomni_api_key', 'EMPTY')
-        if api_key and api_key != 'EMPTY':
-            os.environ['OPENAI_API_KEY'] = api_key
-            print("[DEBUG] Set OPENAI_API_KEY environment variable", flush=True)
-        
+        print("[BIOMNI] Initializing Biomni agent...", flush=True)
+
         agent = A1(
-            path=biomni_data_path,
+            path=config['biomni_data_path'],
             llm=config['biomni_llm_model'],
             timeout_seconds=config['biomni_timeout_seconds'],
             base_url=config.get('biomni_base_url'),
-            api_key=api_key
+            api_key=config['biomni_api_key']
         )
         
         print("[BIOMNI] Agent initialized successfully", flush=True)
         
         # Execute query with real-time streaming
         print("[BIOMNI] Starting query execution...", flush=True)
+
+        # Stream the agent execution by intercepting the workflow stream
+        stream_agent_execution(agent, query)
         
-        try:
-            # Set up the agent for streaming
-            from langchain_core.messages import HumanMessage
-            inputs = {"messages": [HumanMessage(content=query)], "next_step": None}
-            config = {"recursion_limit": 500, "configurable": {"thread_id": 42}}
-            
-            # Stream the execution and output in real-time
-            step_count = 0
-            final_message = None
-            
-            for step_output in agent.app.stream(inputs, stream_mode="values", config=config):
-                step_count += 1
-                message = step_output["messages"][-1]
-                final_message = message
+        print("[BIOMNI] Analysis completed successfully", flush=True)
                 
-                # Import pretty_print from biomni.utils for consistent formatting
-                from biomni.utils import pretty_print
-                formatted_output = pretty_print(message)
-                
-                if formatted_output and formatted_output.strip():
-                    print(f"[LOG] Step {step_count}: {formatted_output}", flush=True)
-            
-            # Get the final result
-            if final_message and hasattr(final_message, 'content'):
-                final_result = final_message.content
-                if final_result and final_result.strip():
-                    print(f"[RESULT] {final_result}", flush=True)
-            
-            print("[BIOMNI] Analysis completed successfully", flush=True)
-            
-        except Exception as streaming_error:
-            print(f"[BIOMNI] Streaming failed, falling back to standard execution: {streaming_error}", flush=True)
-            
-            # Fallback to the original synchronous method
-            log, final_result = agent.go(query)
-            
-            print("[BIOMNI] Query execution completed", flush=True)
-            
-            # Output log entries
-            if log:
-                print("[BIOMNI] Processing log entries:", flush=True)
-                for entry in log:
-                    if entry and entry.strip():
-                        print(f"[LOG] {entry}", flush=True)
-            
-            # Output final result
-            if final_result and final_result.strip():
-                print("[BIOMNI] Final result:", flush=True)
-                print(f"[RESULT] {final_result}", flush=True)
-            
-            print("[BIOMNI] Analysis completed successfully", flush=True)
-        
     except Exception as e:
         print(f"[ERROR] Execution failed: {str(e)}", file=sys.stderr)
         sys.exit(1)
