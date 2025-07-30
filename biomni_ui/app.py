@@ -35,21 +35,9 @@ async def start():
         biomni_wrapper = AsyncBiomniWrapper(session_id)
         cl.user_session.set("biomni_wrapper", biomni_wrapper)
         
-        # Send welcome message
-        file_upload_info = ""
-        if config.file_upload_enabled:
-            allowed_types = ", ".join(config.allowed_file_types[:10])  # Show first 10 types
-            more_types = f" and {len(config.allowed_file_types) - 10} more" if len(config.allowed_file_types) > 10 else ""
-            file_upload_info = f"""
-
-📎 **File Upload Support**: You can upload files for analysis!
-Supported formats: {allowed_types}{more_types}
-Maximum file size: {config.max_file_size_mb}MB
-"""
-        
         welcome_msg = f"""Welcome to Biomni UI.
 
-I am your biomedical AI assistant. I can help you with biomedical research tasks, data analysis, experimental design, literature research, and database queries.{file_upload_info}
+I am your biomedical AI assistant. I can help you with biomedical research tasks, data analysis, experimental design, literature research, and database queries.
 
 Please ask your question and I will use specialized tools and knowledge to assist you.
 """
@@ -164,6 +152,12 @@ SYSTEM INSTRUCTIONS:
 3. Analysis Summary:
    - Always generate a Jupyter notebook as the last step to summarize the analysis
    - Include all key findings, visualizations, and conclusions in the notebook
+   
+4. Generate a detailed summary using Markdown formatting. 
+- Use bullet points, bold labels, and sections. 
+- Do NOT use Markdown heading syntax (e.g., `#`, `===`, or `---`) to start lines or as separators.
+- If you want to emphasize a section, use bold titles or surround with asterisks or code blocks.
+   
 """
     
     if config.file_upload_enabled:
