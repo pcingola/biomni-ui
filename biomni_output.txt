@@ -58,7 +58,7 @@ import pandas as pd
 import os
 
 print("=== Checking gene information data lake ===")
-data_lake_path = "/Users/kgpg795/Projects/personal/Biomni/data/biomni_data/data_lake"
+data_lake_path = "/Users/user_name/Projects/personal/Biomni/data/biomni_data/data_lake"
 gene_info_path = os.path.join(data_lake_path, "gene_info.parquet")
 
 if os.path.exists(gene_info_path):
@@ -113,7 +113,7 @@ try:
 except Exception as e:
     print(f"Error retrieving sequence: {e}")
 </execute>
-/Users/kgpg795/miniconda/envs/biomni_e1/lib/python3.11/site-packages/Bio/Entrez/__init__.py:734: UserWarning: 
+/Users/user_name/miniconda/envs/biomni_e1/lib/python3.11/site-packages/Bio/Entrez/__init__.py:734: UserWarning: 
             Email address is not specified.
 
             To make use of NCBI's E-utilities, NCBI requires you to specify your
