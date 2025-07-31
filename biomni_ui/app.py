@@ -35,12 +35,12 @@ async def start():
         biomni_wrapper = AsyncBiomniWrapper(session_id)
         cl.user_session.set("biomni_wrapper", biomni_wrapper)
         
-        welcome_msg = f"""Welcome to Biomni UI.
-
-I am your biomedical AI assistant. I can help you with biomedical research tasks, data analysis, experimental design, literature research, and database queries.
-
-Please ask your question and I will use specialized tools and knowledge to assist you.
-"""
+        welcome_msg = (
+            "Welcome to Biomni UI.\n\n"
+            "I am your biomedical AI assistant. I can help you with biomedical research tasks, data analysis, experimental design, literature research, and database queries.\n\n"
+            "**Disclaimer:** Use only public, non-confidential, non-clinical data. Do not upload or share private, sensitive, or patient-identifiable information.\n\n"
+            "Please ask your question and I will use specialized tools and knowledge to assist you."
+        )
         
         await cl.Message(content=welcome_msg).send()
         
