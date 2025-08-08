@@ -142,25 +142,24 @@ def selected_to_markdown(selected: SelectedToolsModel) -> str:
 
 def step_to_markdown(i: int, s: Step) -> str:
     parts = [f"### {i}. {s.name}\n{s.description}\n"]
+
     if s.resources:
-        res_rows = "\n".join(f"| {r.name} | {r.reason or '—'} |" for r in s.resources)
-        parts.append(
-            "Resources used:\n\n| Name | Reason |\n| --- | --- |\n" + res_rows + "\n"
-        )
+        res_rows = "\n".join(f"| {r.name} | {getattr(r, 'reason', None) or '—'} |" for r in s.resources)
+        parts.append("Resources used:\n\n| Name | Reason |\n| --- | --- |\n" + res_rows + "\n")
+
     if s.cites:
-        # keep order, drop empties/dupes
         seen, cites = set(), []
         for c in s.cites:
             if c and c not in seen:
-                seen.add(c)
-                cites.append(c)
-
+                seen.add(c); cites.append(c)
         if cites:
             parts.append("Cites:\n" + "\n".join(f"- {c}" for c in cites) + "\n")
+
     if s.result:
         parts.append(f"**Result:** {s.result}\n")
     if s.stderr:
         parts.append(f"**Stderr**\n\n```text\n{s.stderr}\n```\n")
+
     return "\n".join(parts)
 
 def execution_to_markdown(ex: ExecutionResult) -> str:
@@ -234,7 +233,7 @@ def format_progress_line(node, title: str| None) -> str:
     """Return a user-friendly, reactive progress line based only on the node's data."""
     tname = type(node).__name__
 
-    prefix = f"### {title}\n⏳ Thinking...\n" if title else ""
+    prefix = f"### {title}\n*⏳ Thinking...* - " if title else ""
 
     # UserPromptNode: reflect the user’s question
     if hasattr(node, "user_prompt"):

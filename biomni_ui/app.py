@@ -27,8 +27,7 @@ from biomni_ui.utils import (
     execution_to_markdown,
     update_history,
     gather_execution_elements,
-    format_progress_line,
-    coerce_execution_result
+    format_progress_line
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
