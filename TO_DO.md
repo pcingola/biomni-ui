@@ -1,14 +1,23 @@
-# To do 
+# To do
 
-- [ ] Add Biomni as a submodule
-- [ ] Add process management
-- [ ] Add Chainlit
-- [ ] Add file upload capability
-- [ ] Add session management
-- [ ] Add disclaimer message
+## Backlog
+
+- [ ] Expose as A2A agent.
 
 ## To prioritize
 
-- [ ] Add Docker container
+- [ ] Exposing tools as MCP servers.
+- [ ] Migrating to an agent using just PydanticAI+MCP
+- [ ] Updating UI to handle new ouput
 
-# Done
+## Done
+
+- [x] Add Docker container
+- [x] Add Biomni as a submodule
+- [x] Add process management
+- [x] Add Chainlit
+- [x] Add file upload capability
+- [x] Add session management
+- [x] Add disclaimer message
+- [x] Replicate selection prompt in Pydantic
+- [x] Replicate planning/execution behavior
