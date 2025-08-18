@@ -1,15 +1,13 @@
 import glob
 import os
 import chainlit as cl
-import json
-import re
+import shutil
 
 from pathlib import Path
 from aixtools.agents import get_agent
 from aixtools.logging.logging_config import get_logger
 from pydantic_ai import Agent
 from string import Template
-from typing import Any
 
 from biomni_ui.models import Resource, SelectedToolsModel, ExecutionResult
 from biomni_ui.mcp_servers import _SERVER_MAP, MCPServerStreamableHTTPRestrictiveContext
@@ -30,9 +28,13 @@ async def get_initial_tools() -> list[Resource]:
     """
     tools: list[Resource] = []
     for server in _SERVER_MAP.values():
-        for tool in (await server.get_tools(None)).values():
-            if tool.tool_def.name not in {t.name for t in tools}:
-                tools.append(Resource(name=tool.tool_def.name, reason=tool.tool_def.description))
+        try:
+            for tool in (await server.get_tools(None)).values():
+                if tool.tool_def.name not in {t.name for t in tools}:
+                    tools.append(Resource(name=tool.tool_def.name, reason=tool.tool_def.description))
+        except Exception as e:
+            logger.error(f"Error getting tools from {server}: {e}")
+            raise Exception(f"Failed to get initial tools from {server}: {e}")
     return tools
 
 
@@ -157,6 +159,14 @@ def step_to_markdown(i: int, s: Step) -> str:
 
     if s.result:
         parts.append(f"**Result:** {s.result}\n")
+    if s.stdout:
+        stdout_str = str(s.stdout)
+        max_len = 2000
+        if len(stdout_str) > max_len:
+            clipped = stdout_str[:max_len] + "\n... (truncated)"
+        else:
+            clipped = stdout_str
+        parts.append(f"**Stdout**\n\n```text\n{clipped}\n```\n")
     if s.stderr:
         parts.append(f"**Stderr**\n\n```text\n{s.stderr}\n```\n")
 
@@ -168,22 +178,34 @@ def execution_to_markdown(ex: ExecutionResult) -> str:
 
 def gather_execution_elements(
     ex: ExecutionResult,
-    session_outputs: str | Path,
+    session_dir: str | Path,
 ) -> list:
-    """Create Chainlit elements for the notebook and each step's output files."""
-    base = Path(session_outputs).resolve()
-    elements: list[cl.Element] = []
-    seen: set[Path] = set()
+    """Create Chainlit elements for the notebook and each step's output files.
+    Files are moved into `session_dir` before creating Chainlit elements.
+    """
+    session_dir = Path(session_dir).resolve()
+    session_dir.mkdir(parents=True, exist_ok=True)
 
+    elements: list = []
+    seen: set[Path] = set()
+    
     def add_path(path_str: str, label: str | None = None):
         p = Path(path_str)
-        if not p.is_absolute():
-            p = base / p
-        p = p.resolve()
 
         if not p.exists():
             logger.warning("Skipped missing file: %s", p)
             return
+
+        # Copy/move into session_dir
+        target = session_dir / p.name
+        counter = 1
+        while target.exists():  # avoid overwriting
+            target = session_dir / f"{p.stem}_{counter}{p.suffix}"
+            counter += 1
+
+        shutil.move(str(p), target)
+        p = target.resolve()
+
         if p in seen:
             return
         seen.add(p)
@@ -195,8 +217,8 @@ def gather_execution_elements(
             elements.append(cl.File(path=str(p), name=name, display="inline"))
 
     # Add notebook first (if present)
-    if getattr(ex, "jupyter_notebook", None):
-        add_path(ex.jupyter_notebook, label=ex.jupyter_notebook.split("/")[-1])
+    if ex.jupyter_notebook:
+        add_path(ex.jupyter_notebook, label=Path(ex.jupyter_notebook).name)
 
     # Add step outputs
     for idx, step in enumerate(ex.step, start=1):

@@ -1,5 +1,5 @@
 import json
-from pydantic import BaseModel, Field, model_validator, ConfigDict
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 class Resource(BaseModel):
     """
@@ -54,25 +54,6 @@ class Step(BaseModel):
     output_files: list[str] | None = None
     stdout: str | None = None
     stderr: str | None = None
-    
-    def __str__(self) -> str:
-        out = f"● {self.name}\n{self.description}\n"
-        if self.result:
-            out += f"Result: {self.result}\n"
-        if self.stderr:
-            out += f"Error : {self.stderr}\n"
-        return out
-    
-    @model_validator(mode='before')
-    @classmethod
-    def _coerce_step(cls, v):
-        if isinstance(v, str):
-            try: v = json.loads(v)
-            except Exception: return {"name": "Unknown step", "description": v}
-        if isinstance(v, dict) and isinstance(v.get("resources"), str):
-            try: v["resources"] = json.loads(v["resources"])
-            except Exception: pass
-        return v
 
 class ExecutionResult(BaseModel):
     """
@@ -90,29 +71,16 @@ class ExecutionResult(BaseModel):
         None, description="Jupyter notebook content if applicable"
     )
     
-    @model_validator(mode='before')
-    @classmethod
-    def _coerce_exec(cls, v):
-        if isinstance(v, dict):
-            data = dict(v)
-            if "step" not in data and "steps" in data:
-                data["step"] = data.pop("steps")
-            s = data.get("step")
-            if isinstance(s, str):
-                try: data["step"] = json.loads(s)
-                except Exception: data["step"] = [s]
-            if isinstance(data.get("step"), list):
-                fixed = []
-                for item in data["step"]:
-                    if isinstance(item, str):
-                        try: fixed.append(json.loads(item))
-                        except Exception: fixed.append(item)
-                    else:
-                        fixed.append(item)
-                data["step"] = fixed
-            data.setdefault("summary", "")
-            return data
+    # Accept dict, list, or JSON string for 'step'
+    @field_validator("step", mode="before")
+    def _parse_step_if_string(cls, v):
+        if v is None:
+            return []
         if isinstance(v, str):
-            try: return json.loads(v)
-            except Exception: return {"step": [], "summary": v}
+            try:
+                v = json.loads(v)  # was a JSON-encoded string
+            except Exception:
+                raise ValueError("`step` must be an array or JSON array string.")
+        if isinstance(v, dict):
+            return [v]  # accept a single object
         return v

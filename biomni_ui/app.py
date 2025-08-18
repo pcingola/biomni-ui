@@ -7,15 +7,13 @@ import chainlit as cl
 
 from aixtools.logging.logging_config import get_logger
 
-from pydantic import ValidationError
 from pydantic_ai import Agent
-from typing import Any
 
 # --- biomni-ui imports -------------------------------------------------------
 from biomni_ui.config import config
 from biomni_ui.file_manager import FileManager, FileManagerError
 from biomni_ui.file_validator import FileValidationError
-from biomni_ui.models import SelectedToolsModel, ExecutionResult
+from biomni_ui.models import SelectedToolsModel
 from biomni_ui.session_manager import session_manager
 from biomni_ui.utils import (
     get_initial_tools,
@@ -85,13 +83,6 @@ async def handle_file_attachments(elements: list[cl.File], session_id: str) -> N
 # Agent runner
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _extract_raw_output(result: Any) -> Any:
-    """Prefer typed .data, fall back to .output."""
-    if result is None:
-        return None
-    return getattr(result, "data", None) or getattr(result, "output", None)
-
-
 async def run_agent(agent: Agent, prompt: str | list[str], msg: cl.Message, title: str | None):
     """
     Like your print-based version, but:
@@ -104,22 +95,24 @@ async def run_agent(agent: Agent, prompt: str | list[str], msg: cl.Message, titl
     try:
         async with agent.iter(prompt) as agent_run:
             async for node in agent_run:
-                
                 msg.content = format_progress_line(node, title=title)
+                logger.debug(msg.content)
                 await msg.update()
-                # Capture final output when the graph ends
+            
                 if Agent.is_end_node(node):
                     result = agent_run.result
-
-        await msg.remove()
-        return result.output if result else None
+            
+        return result
 
     except Exception as exc:
         # Show a readable error + stack
         stack = traceback.format_exc()
-        msg.content = f"❌ Error: {exc}"
-        msg.elements.append(cl.Text(name="Stack trace", content=stack, language="python"))
-        await msg.update()
+        error_msg = cl.Message(
+            content=f"❌ Error: {exc}",
+            elements=[cl.Text(name="Stack trace", content=stack, language="python")]
+        )
+        await error_msg.send()
+        logger.error(f"Error occurred: {exc}\n{stack}")
         return None
     
 async def handle_user_query(message: cl.Message):
@@ -171,50 +164,37 @@ async def handle_user_query(message: cl.Message):
     await tool_selection_status.send()
     selector_agent = await build_tool_selector(initial_tools, data_items, libraries)
     selected = await run_agent(selector_agent, enhanced_query, msg=tool_selection_status, title="Selecting the most relevant resources")
-    history = update_history(history, run_return=selected)
+    history = update_history(history, run_return=selected.output)
     await tool_selection_status.remove()
-    if isinstance(selected, SelectedToolsModel):
-        await cl.Message(content=selected_to_markdown(selected)).send()
+    if isinstance(selected.output, SelectedToolsModel):
+        await cl.Message(content=selected_to_markdown(selected.output)).send()
     else:
-        await cl.Message(content=f"### Selected resources\n\n{selected}").send()
+        await cl.Message(content=f"### Selected resources\n\n{selected.output}").send()
 
     # PLAN & EXECUTION
-    execution_status = cl.Message(content="### Executing...")
+    execution_status = cl.Message(content="### Executing...")
     await execution_status.send()
-    executor_agent = await build_executor(selected, session_dir=session_outputs)
+    executor_agent = await build_executor(selected.output, session_dir=session_outputs)
     execution = await run_agent(executor_agent, enhanced_query, msg=execution_status, title="Executing")
     history = update_history(history, run_return=execution)
     cl.user_session.set(HISTORY, history)
     await execution_status.remove()
 
     # FINAL REPORT
-    if isinstance(execution, ExecutionResult):
-        report_md = execution_to_markdown(execution)
-        elements = gather_execution_elements(execution, session_outputs)
-
+    try:
+        report_md = execution_to_markdown(execution.output)
+        elements = gather_execution_elements(execution.output, session_outputs)
+    except Exception as e:
+        logger.error(f"Error gathering execution elements: {e}")
         await cl.Message(
-            content=report_md,
-            elements=elements,  # images/files show inline with the report
+                content=f"❌ Error: Error gathering execution elements: {e}"
         ).send()
-    else:
-        execution = coerce_execution_result(execution.data if execution else None) \
-            or coerce_execution_result(execution.output if execution else None)
 
-        if execution:
-            # your existing rendering path
-            elements = gather_execution_elements(execution, session_outputs)
-
-            await cl.Message(
-                content=report_md,
-                elements=elements,  # images/files show inline with the report
-            ).send()
-            await cl.Message(
-                content=report_md,
-                elements=elements,  # images/files show inline with the report
-            ).send()
-        else:
-            await cl.Message(content=f"### ✅ Finished\n\n{execution}").send()
-        
+    await cl.Message(
+        content=report_md,
+        elements=elements,  # images/files show inline with the report
+    ).send()
+    
 # ─────────────────────────────────────────────────────────────────────────────
 # Chainlit lifecycle events
 # ─────────────────────────────────────────────────────────────────────────────

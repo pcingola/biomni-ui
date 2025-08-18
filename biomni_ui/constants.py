@@ -72,43 +72,39 @@ Work step-by-step, but return outputs ONLY as a JSON object that exactly matches
 
 ## STRICT OUTPUT CONTRACT — ExecutionResult ONLY
 
-- Return only valid JSON for the following Pydantic schema. Do not wrap JSON in markdown fences. Do not stringify nested fields
-- Final answer must be valid JSON matching:
+**CRITICAL: You MUST return ONLY a valid JSON object. No markdown code blocks, no extra text, no comments.**
+
+The response must be a valid JSON object that exactly matches this ExecutionResult schema:
 
 {
   "step": [
     {
-      "name": "string",
+      "name": "string (required)",
       "description": "string",
-      "resources": null,
-      "result": "string",
-      "cites": ["string"],
-      "output_files": ["string"],
-      "stdout": "string or null",
-      "stderr": "string or null"
+      "resources": [{"name":"...", "reason":"..."}],
+      "result": "string?",
+      "cites": ["https://..."],
+      "output_files": ["relative-or-filename.ext"],
+      "stdout": "string?",
+      "stderr": "string?"
     }
   ],
   "summary": "string",
-  "jupyter_notebook": "string or null"
+  "jupyter_notebook": "string?"
 }
 
-## Global paths
-- SESSION_OUTPUTS: {SESSION_OUTPUTS}
-
-Rules:
-- Output JSON only. No extra keys. Use null for unknown optionals; [] for empty lists.
-- Include at least one step. Every step must have non-empty name, description, and result.
-- Do not fabricate stdout/stderr/output_files. If nothing ran, set them to null.
-- Truncate very long logs to ~10000 characters and note the truncation in `stdout`/`stderr`.
-
-## Streaming contract
-On partial updates, always emit a fully-formed, valid `ExecutionResult` JSON object.
-It may be incomplete (fewer steps, null logs), but must remain valid JSON and type-stable.
-Append steps or fill fields as work progresses—do not change keys or types.
+**CRITICAL FORMATTING REQUIREMENTS:**
+- Return the JSON object directly, with no markdown formatting like ```json or ```
+- Do not wrap the JSON in any code blocks or additional text
+- The response must start with { and end with }
+- No extra keys beyond what's shown in the schema above
+- Use null for unknown optionals; [] for empty lists
+- Include at least one step. Every step must have non-empty name, description, and result
+- Do not fabricate stdout/stderr/output_files. If nothing ran, set them to null
+- Truncate very long logs to ~10000 characters and note the truncation in `stdout`/`stderr`
 
 ## File generation rules
 - Do NOT call plt.show() / display(); use a non-interactive backend (e.g., matplotlib.use('Agg')) and save files.
-- All files you create MUST be written under {SESSION_OUTPUTS}.
 - Filenames: use a short slug for the task + UTC timestamp, e.g. `align-reads-20250101-120102.ext`.
 - When you return paths in `output_files` or `jupyter_notebook`, return ABSOLUTE paths inside SESSION_OUTPUTS.
 
@@ -117,38 +113,7 @@ Append steps or fill fields as work progresses—do not change keys or types.
 - Save to: {SESSION_OUTPUTS}/{task_slug}-{utc_ts}.ipynb
 - Set `jupyter_notebook` to that exact path in the FINAL JSON (not null).
 - Follow the cell structure described earlier (preamble, env, config, one cell per step, summary, references).
-- No interactive display; save figures to files.
-- Do NOT call plt.show() / display(); use a non-interactive backend (e.g., matplotlib.use('Agg')) and save files.
 
-### Streaming contract for paths
-- During partial updates, `jupyter_notebook` may be null.
-- The final emission MUST have `jupyter_notebook` ending with `.ipynb` and the file must exist on disk.
-- Every `output_files` entry MUST be an absolute path under {SESSION_OUTPUTS}.
-
-## Minimal valid example
-{
-  "step": [
-    {
-      "name": "Load dataset",
-      "description": "Locate and load the input file from the data lake.",
-      "resources": null,
-      "result": "Loaded 12,543 rows from s3://bucket/path.csv",
-      "cites": null,
-      "output_files": null,
-      "stdout": null,
-      "stderr": null
-    }
-  ],
-  "summary": "Loaded the dataset successfully. Further analysis pending.",
-  "jupyter_notebook": "{SESSION_OUTPUTS}/jupyter_notebook_path.ipynb"
-}
-
-RESPONSE BOUNDARY RULES
-- The very first character MUST be '{' and the very last MUST be '}'.
-- Do NOT use markdown code fences.
-- Do NOT include any text before or after the JSON.
-- Do NOT stringify nested objects or arrays. Use proper JSON types.
-- On every partial update, return a COMPLETE, valid ExecutionResult object. Keep types stable.
 """
 
 AVAILABLE_LIBRARIES = {
