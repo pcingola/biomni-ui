@@ -118,10 +118,12 @@ async def run_agent(agent: Agent, prompt: str | list[str], msg: cl.Message, titl
 async def handle_user_query(message: cl.Message):
     session_id: str | None = cl.user_session.get("session_id")
     session_outputs = session_manager.get_session_outputs_path(session_id)
+    
     if not session_id:
         await cl.Message("Session missing – refresh the page.").send()
         return
 
+    logger.info(f"[{session_id}] New query submitted: {message.content}")
     initial_status = cl.Message(content="Starting…")
     await initial_status.send()
 
@@ -129,12 +131,14 @@ async def handle_user_query(message: cl.Message):
 
     # File uploads
     if config.file_upload_enabled and message.elements:
+        logger.info(f"[{session_id}] New file(s) uploaded: {', '.join(e.name for e in message.elements)}")
         initial_status.content = "Processing file uploads…"
         await initial_status.update()
         await handle_file_attachments(message.elements, session_id)
 
     # Discover resources
     initial_status.content = "Discovering available resources…"
+    logger.info(f"[{session_id}] Discovering available resources")
     await initial_status.update()
     initial_tools, data_items, libraries = await asyncio.gather(
         get_initial_tools(),
@@ -142,6 +146,7 @@ async def handle_user_query(message: cl.Message):
         asyncio.to_thread(get_libraries_for_query),
     )
     await initial_status.remove()
+    logger.info(f"[{session_id}] Discovered {len(initial_tools)} tools, {len(data_items)} data-lake items, and {len(libraries)} libraries") 
     await cl.Message(
         content=(
             f"✅ Discovered **{len(initial_tools)}** tools, "
@@ -160,6 +165,7 @@ async def handle_user_query(message: cl.Message):
     history = update_history(history, user_message=enhanced_query)
 
     # TOOL SELECTION
+    logger.info(f"[{session_id}] Selecting tools for the query")
     tool_selection_status = cl.Message(content="### Selecting the most relevant resources...")
     await tool_selection_status.send()
     selector_agent = await build_tool_selector(initial_tools, data_items, libraries)
@@ -169,9 +175,12 @@ async def handle_user_query(message: cl.Message):
     if isinstance(selected.output, SelectedToolsModel):
         await cl.Message(content=selected_to_markdown(selected.output)).send()
     else:
+        logger.warning(f"[{session_id}] Tool selection did not return a valid SelectedToolsModel: {selected.output}")
         await cl.Message(content=f"### Selected resources\n\n{selected.output}").send()
+    logger.info(f"[{session_id}] Selected {len(selected.output.tools)} tools, {len(selected.output.data_lake)} data items, and {len(selected.output.libraries)} libraries")
 
     # PLAN & EXECUTION
+    logger.info(f"[{session_id}] Executing the query")
     execution_status = cl.Message(content="### Executing...")
     await execution_status.send()
     executor_agent = await build_executor(selected.output, session_dir=session_outputs)
@@ -184,6 +193,7 @@ async def handle_user_query(message: cl.Message):
     try:
         report_md = execution_to_markdown(execution.output)
         elements = gather_execution_elements(execution.output, session_outputs)
+        logger.info(f"[{session_id}] Execution completed with {len(execution.output.step)} steps")
     except Exception as e:
         logger.error(f"Error gathering execution elements: {e}")
         await cl.Message(

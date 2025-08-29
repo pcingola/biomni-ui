@@ -159,14 +159,7 @@ def step_to_markdown(i: int, s: Step) -> str:
 
     if s.result:
         parts.append(f"**Result:** {s.result}\n")
-    if s.stdout:
-        stdout_str = str(s.stdout)
-        max_len = 2000
-        if len(stdout_str) > max_len:
-            clipped = stdout_str[:max_len] + "\n... (truncated)"
-        else:
-            clipped = stdout_str
-        parts.append(f"**Stdout**\n\n```text\n{clipped}\n```\n")
+
     if s.stderr:
         parts.append(f"**Stderr**\n\n```text\n{s.stderr}\n```\n")
 

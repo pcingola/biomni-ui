@@ -82,10 +82,18 @@ The response must be a valid JSON object that exactly matches this ExecutionResu
       "name": "string (required)",
       "description": "string",
       "resources": [{"name":"...", "reason":"..."}],
-      "result": "string?",
+      "result": "string",
       "cites": ["https://..."],
       "output_files": ["relative-or-filename.ext"],
-      "stdout": "string?",
+      "stderr": "string?"
+    },
+    {
+      "name": "string (required)",
+      "description": "string",
+      "resources": [{"name":"...", "reason":"..."}],
+      "result": "string",
+      "cites": ["https://..."],
+      "output_files": ["relative-or-filename.ext"],
       "stderr": "string?"
     }
   ],
@@ -97,20 +105,22 @@ The response must be a valid JSON object that exactly matches this ExecutionResu
 - Return the JSON object directly, with no markdown formatting like ```json or ```
 - Do not wrap the JSON in any code blocks or additional text
 - The response must start with { and end with }
-- No extra keys beyond what's shown in the schema above
-- Use null for unknown optionals; [] for empty lists
+- No extra keys beyond what's shown in the schema above.
+- Use null for unknown optionals; [] for empty lists. Don't provide lists inside of the json as strings.
 - Include at least one step. Every step must have non-empty name, description, and result
-- Do not fabricate stdout/stderr/output_files. If nothing ran, set them to null
-- Truncate very long logs to ~10000 characters and note the truncation in `stdout`/`stderr`
+- Do not fabricate stderr/output_files. If nothing ran, set them to null
+- Truncate very long logs to ~10000 characters and note the truncation in `stderr`.
+- ALWAYS provide a summary with key findings and insights.
 
 ## File generation rules
 - Do NOT call plt.show() / display(); use a non-interactive backend (e.g., matplotlib.use('Agg')) and save files.
 - Filenames: use a short slug for the task + UTC timestamp, e.g. `align-reads-20250101-120102.ext`.
-- When you return paths in `output_files` or `jupyter_notebook`, return ABSOLUTE paths inside SESSION_OUTPUTS.
+- When you return paths in `output_files` or `jupyter_notebook`, return ABSOLUTE paths.
+- Include all relevant files coming from that step in the "output_files" list.
 
 ## Notebook generation contract (MANDATORY)
 - You MUST generate a Jupyter Notebook that reproduces the analysis.
-- Save to: {SESSION_OUTPUTS}/{task_slug}-{utc_ts}.ipynb
+- Save as: {task_slug}-{utc_ts}.ipynb
 - Set `jupyter_notebook` to that exact path in the FINAL JSON (not null).
 - Follow the cell structure described earlier (preamble, env, config, one cell per step, summary, references).
 
