@@ -42,6 +42,36 @@ Assertions:
 
 - The case passes if the overall judge score is ≥ `overall_threshold` and all specified per-criterion thresholds are met.
 
+Example of the output of an evaluation:
+
+```bash
+INFO     eval.tests:test_eval_cases.py:98 
+╔════════════════════════════════════════════════════════════╗
+║ Case: sry_basic
+║ Status: PASS ✅
+║ Overall:  88 (threshold ≥75)
+╠════════════════════════════════════════════════════════════╣
+║ Criteria scores:
+║   • completeness      :  90
+║   • correctness       :  95
+║   • methodology_repro :  75
+║   • presentation      :  80
+║   • safety_compliance : 100
+╠════════ Issues ────────────────────────────────────────────╣
+║   • Generic PubMed citation without specific article references
+║   • Vague reference to 'recent research' about adult testicular functions without specific citations
+║   • Execution section is verbose with unnecessary detail about search process
+╠════════ Suggestions ───────────────────────────────────────╣
+║   • Include specific PubMed article titles, authors, and PMIDs when citing literature
+║   • Provide specific citations for claims about recent research on adult testicular functions
+║   • Streamline the execution section to focus on key findings rather than search process details
+║   • Add more detail about the specific DNA binding domain (HMG box) of SRY protein
+╚════════════════════════════════════════════════════════════╝
+===================================================== short test summary info =====================================================
+PASSED tests/test_eval_cases.py::test_yaml_case[sry_basic]
+============================================ 1 passed, 2 warnings in 94.17s (0:01:34) =============================================
+```
+
 ## Writing Cases (YAML)
 
 Create a new file under `eval/cases/your_case_id.yaml`:
