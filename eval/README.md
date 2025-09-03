@@ -166,5 +166,5 @@ python -m pytest -k sry_basic -q
 EVAL_CASE="genes_per_chr,sry" python -m pytest -q
 ```
 
-
-!!! Ensure API keys are configured for your model provider in the `.env` file.
+> [!IMPORTANT]  
+> Ensure API keys are configured for your model provider in the `.env` file.
