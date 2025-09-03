@@ -1,0 +1,16 @@
+rubric:
+  - name: correctness
+    weight: 0.40
+    description: Facts are accurate; no hallucinations.
+  - name: completeness
+    weight: 0.25
+    description: Fully addresses the question with needed depth.
+  - name: methodology_repro
+    weight: 0.15
+    description: Steps clear enough for reproduction.
+  - name: safety_compliance
+    weight: 0.10
+    description: No PHI/unsafe/proprietary content.
+  - name: presentation
+    weight: 0.10
+    description: Clear, well structured, helpful formatting.
