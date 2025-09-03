@@ -1,6 +1,6 @@
 # Evals Guide
 
-This repo includes a lightweight evaluation harness to test your Biomni agent end-to-end and score answers with an LLM judge. Evals are:
+This module includes a evaluation framework to test the Pydantic agent end-to-end and score answers with an LLM judge. The evals are based on:
 
 - YAML-driven (one file per test case).
 - Pytest-based (each YAML becomes its own test).
