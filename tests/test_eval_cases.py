@@ -117,6 +117,12 @@ async def test_yaml_case(case):
         pytest.fail(f"[{cid}] timed out after {timeout_s}s")
 
     report = run_res.answer_markdown
+    
+    reports_dir = REPO_ROOT / "eval" / "reports"
+    reports_dir.mkdir(exist_ok=True)
+    report_file = reports_dir / f"{cid}_report.md"
+    report_file.write_text(report)
+    logger.info(f"Report saved to: {report_file}")
 
     # 2) Hard expectations (pre-judge)
     _assert_text_expectations(report, exp)
