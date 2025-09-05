@@ -1,0 +1,17 @@
+id: brca1_boolean
+query: "Is the BRCA1 gene located on chromosome 17 of the human genome (hg38)? Specify your answer as simply True or False."
+timeout_s: 300
+
+expect:
+  must_contain:
+    - "True"
+  must_not_contain: ["False"]
+  regex_must_match: []
+  min_steps: 1
+  required_tools: [] 
+
+judge:
+  request: |
+    Simply check if the answer is factually correct about BRCA1 gene location on
+    chromosome 17 in hg38. Penalize incorrect or speculative answers.
+  overall_threshold: 75

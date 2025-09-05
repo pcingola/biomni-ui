@@ -1,0 +1,24 @@
+id: rosalind_DNA_counting
+query: |
+  A string is simply an ordered collection of symbols selected from some alphabet and formed into a word;
+  the length of a string is the number of symbols that it contains. An example of a length 21 DNA string
+  (whose alphabet contains the symbols 'A', 'C', 'G', and 'T') is "ATGCTTCAGAAAGGTCTTACG." Given this DNA string
+  "AGCTTTTCATTCTGACTGCAACGGGCAATATGTCTCTGTGTGGATTAAAAAAAGAGTGTCTGATAGCAGC"
+  Return Four integers (separated by spaces) counting the respective number of times that the symbols 'A', 'C', 'G', and 'T' occur in s
+timeout_s: 300
+
+expect:
+  must_contain:
+    - "20"
+    - "12"
+    - "17"
+    - "21"
+  must_not_contain: ["False"]
+  regex_must_match: []
+  min_steps: 1
+  required_tools: [] 
+
+judge:
+  request: |
+    Simply check if the answer is factually correct about the counts of A, C, G, and T in the given DNA string. Penalize incorrect or speculative answers.
+  overall_threshold: 75
