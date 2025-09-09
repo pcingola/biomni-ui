@@ -5,7 +5,7 @@ timeout_s: 300
 expect:
   must_contain:
     - "chr17"
-    - "43044295"
+    - "43044292"
     - "43170245"
   must_not_contain: []
   regex_must_match: []
@@ -15,4 +15,4 @@ expect:
 judge:
   request: |
     Simply check if the coordinates provided for the BRCA1 gene in hg38 are correct.
-  overall_threshold: 75
+  overall_threshold: 80
