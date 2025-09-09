@@ -2,10 +2,13 @@ id: rosalind_DNA_counting
 query: |
   A string is simply an ordered collection of symbols selected from some alphabet and formed into a word;
   the length of a string is the number of symbols that it contains. An example of a length 21 DNA string
-  (whose alphabet contains the symbols 'A', 'C', 'G', and 'T') is "ATGCTTCAGAAAGGTCTTACG." Given this DNA string
-  "AGCTTTTCATTCTGACTGCAACGGGCAATATGTCTCTGTGTGGATTAAAAAAAGAGTGTCTGATAGCAGC"
+  (whose alphabet contains the symbols 'A', 'C', 'G', and 'T') is "ATGCTTCAGAAAGGTCTTACG." 
+  Given a DNA string in FASTA format of length at most 1000 nt
   Return Four integers (separated by spaces) counting the respective number of times that the symbols 'A', 'C', 'G', and 'T' occur in s
 timeout_s: 300
+
+attachments:
+  - "/Users/kbfk062/workspace/biomni-ui/eval/cases/files/dna_counting.fasta"
 
 expect:
   must_contain:
@@ -21,4 +24,4 @@ expect:
 judge:
   request: |
     Simply check if the answer is factually correct about the counts of A, C, G, and T in the given DNA string. Penalize incorrect or speculative answers.
-  overall_threshold: 75
+  overall_threshold: 90
