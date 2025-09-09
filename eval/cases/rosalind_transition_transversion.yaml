@@ -1,0 +1,22 @@
+id: rosalind_transition_transversion
+query: |
+  For DNA strings s1 and s2 having the same length, their transition/transversion ratio R(s1,s2) is the ratio of the total number of transitions to the total number of transversions, where symbol substitutions are inferred from mismatched corresponding symbols as when calculating Hamming distance.
+
+  Given two DNA strings s1 and s2 of equal length (at most 1 kbp).
+  
+  Return: The transition/transversion ratio R(s1,s2)
+
+timeout_s: 300
+
+expect:
+  must_contain:
+    - "1.21"
+  must_not_contain: []
+  regex_must_match: []
+  min_steps: 1
+  required_tools: [] 
+
+judge:
+  request: |
+    Simply check if the ratio is correctly calculated from the given two DNA strings. Penalize incorrect or speculative answers.
+  overall_threshold: 10

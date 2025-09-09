@@ -8,33 +8,26 @@ query: |
             
   For a collection of strings and a positive integer k, the overlap graph for the strings is a directed graph Ok in which each string is represented by a node, and string s is connected to string t with a directed edge when there is a length k suffix of s that matches a length k prefix of t, as long as s≠t; we demand s≠t to prevent directed loops in the overlap graph (although directed cycles may be present).  
 
-  Given the following DNA strings in FASTA:
-    >Rosalind_0498
-      AAATAAA
-    >Rosalind_2391
-      AAATTTT
-    >Rosalind_2323
-      TTTTCCC
-    >Rosalind_0442
-      AAATCCC
-    >Rosalind_5013
-      TTTTAAA
-            
-    Return The adjacency list corresponding to O3. You may return edges in any order. Return each edge as a pair of node labels (separated by a space) on a single line.
+  Given some DNA strings in FASTA format             
+  
+  Return The adjacency list corresponding to O3. You may return edges in any order. Return each edge in the following format: "source_node_label→target_node_label"
 timeout_s: 300
+
+attachments:
+  - "/Users/kbfk062/workspace/biomni-ui/eval/cases/files/graph_theory.fasta"
 
 expect:
   must_contain:
-    - "Rosalind_0498 Rosalind_2391"
-    - "Rosalind_0498 Rosalind_0442"
-    - "Rosalind_2391 Rosalind_2323"
+    - "Rosalind_0498→Rosalind_2391"
+    - "Rosalind_0498→Rosalind_0442"
+    - "Rosalind_2391→Rosalind_2323"
   must_not_contain: 
-    - "Rosalind_5013 Rosalind_0498"
+    - "Rosalind_5013→Rosalind_0498"
   regex_must_match: []
   min_steps: 1
   required_tools: [] 
 
 judge:
   request: |
-    Simply check if the answer is factually correct about the counts of A, C, G, and T in the given DNA string. Penalize incorrect or speculative answers.
-  overall_threshold: 75
+    Simply check if the answer contains the expected edges and not other edges. Penalize incorrect or speculative answers.
+  overall_threshold: 80

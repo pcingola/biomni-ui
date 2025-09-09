@@ -1,0 +1,26 @@
+id: rosalind_RNA_splicing
+query: |
+  Problem
+  After identifying the exons and introns of an RNA string, we only need to delete the introns and concatenate the exons to form a new string ready for translation.
+
+  Given A DNA string s (of length at most 1 kbp) and a collection of substrings of s acting as introns. All strings are given in FASTA format.
+
+  Return A protein string resulting from transcribing and translating the exons of s. (Note: Only one solution will exist for the dataset provided.)
+
+timeout_s: 300
+
+attachments:
+  - "/Users/kbfk062/workspace/biomni-ui/eval/cases/files/rna_splicing.fasta"
+
+expect:
+  must_contain:
+  - "MVYIADKQHVASREAYGHMFKVCA"
+  must_not_contain: []
+  regex_must_match: []
+  min_steps: 1
+  required_tools: [] 
+
+judge:
+  request: |
+    Check if the protein string is correctly derived from the given DNA string by removing introns and translating the exons. Penalize incorrect or speculative answers.
+  overall_threshold: 80

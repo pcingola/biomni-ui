@@ -1,0 +1,29 @@
+id: rosalind_n50_n75
+query: |
+  Given a collection of DNA strings representing contigs, we use the N statistic NXX (where XX ranges from 01 to 99) to represent the maximum positive integer L
+  such that the total number of nucleotides of all contigs having length ≥L
+  is at least XX% of the sum of contig lengths. The most commonly used such statistic is N50, although N75 is also worth mentioning.
+
+  Given a collection of at most 1000 DNA strings given in FASTA format (whose combined length does not exceed 50 kbp).
+
+  Return N50 and N75 for this collection of strings.
+
+
+timeout_s: 300
+
+attachments:
+  - "/Users/kbfk062/workspace/biomni-ui/eval/cases/files/n50_n75.fasta"
+
+expect:
+  must_contain:
+    - "7"
+    - "6"
+  must_not_contain: []
+  regex_must_match: []
+  min_steps: 1
+  required_tools: [] 
+
+judge:
+  request: |
+    Simply check if the N50 and N75 values provided are correct.
+  overall_threshold: 80
