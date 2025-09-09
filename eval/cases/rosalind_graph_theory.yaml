@@ -14,7 +14,7 @@ query: |
 timeout_s: 300
 
 attachments:
-  - "/Users/kbfk062/workspace/biomni-ui/eval/cases/files/graph_theory.fasta"
+  - "~/eval/cases/files/graph_theory.fasta"
 
 expect:
   must_contain:
