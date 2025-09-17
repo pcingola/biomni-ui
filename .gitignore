@@ -190,4 +190,5 @@ docker-compose.override.yml
 # chainlit outputs
 .chainlit
 
-test_query.py
+sessions/
+biomni.log*

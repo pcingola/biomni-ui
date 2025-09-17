@@ -9,8 +9,17 @@ dependencies = [
     "chainlit>=2.6.2",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
-    "aixtools"
+    "aixtools",
+    "pondera",
+    "pydantic-ai>=1.0.1",
+    "pytest-asyncio>=1.1.0",
 ]
 
 [tool.uv.sources]
 aixtools = { git = "https://github.com/azu-oncology-rd/aixtools.git" }
+pondera = { git = "ssh://git@github.com/PabloCabaleiro/pondera.git", rev = "v0.4.0" }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]

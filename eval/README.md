@@ -88,7 +88,7 @@ expect:                   # Pre-judge checks on the agent's Markdown report
     - "plot"
   must_not_contain: []
   regex_must_match: []
-  min_steps: 1            # (soft) informational only in the default test
+              # (soft) informational only in the default test
 
 judge:
   request: |

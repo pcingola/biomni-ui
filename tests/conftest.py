@@ -16,16 +16,6 @@ def _load_cases():
             cases.append(yaml.safe_load(fh))
     return cases
 
-def _load_rubric():
-    if RUBRIC_FILE.exists():
-        data = yaml.safe_load(RUBRIC_FILE.read_text())
-        return data.get("rubric")
-    return None
-
-@pytest.fixture(scope="session")
-def rubric_yaml():
-    return _load_rubric()
-
 @pytest.fixture(scope="session")
 def cases():
     loaded = _load_cases()

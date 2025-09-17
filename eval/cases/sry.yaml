@@ -1,6 +1,7 @@
 id: sry_basic
-query: "What is the SRY?"
-timeout_s: 300
+
+input:
+  query: "What is the SRY?"
 
 expect:
   must_contain:
@@ -8,11 +9,12 @@ expect:
     - "sex-determining"
   must_not_contain: []
   regex_must_match: []
-  min_steps: 1
-  required_tools: [] 
 
 judge:
   request: |
     Judge factual correctness about SRY gene function, location, and role in
     sex determination. Penalize speculative claims and missing core facts.
   overall_threshold: 75
+
+timeout_s: 300
+repetitions: 3
