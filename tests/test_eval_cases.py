@@ -50,11 +50,6 @@ class EvalBiomniRunner(Runner):
         progress: ProgressCallback | None = None,
     ) -> RunResult:
         """Run the eval LLM orchestrator."""
-        # Convert attachments dict to list format expected by orchestrator
-        attachment_list = []
-        if attachments:
-            for name, content in attachments.items():
-                attachment_list.append({"name": name, "content": content})
 
         fm = FileManager()
         orch = BiomniAgentOrchestrator(file_manager=fm)
